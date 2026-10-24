@@ -59,6 +59,9 @@ backend/
 ├── .gitignore                            # Backend-specific ignore rules (build artifacts, secrets)
 ├── .env.example                          # Safe environment variable configuration template
 ├── README.md                             # Backend documentation and guide
+├── database/                             # Database scripts and execution guide
+│   ├── create-database.sql               # Script to safely create lorry_fleet_db
+│   └── README.md                         # Detailed MySQL 8.4 setup & execution guide
 ├── src/
 │   ├── main/
 │   │   ├── java/
@@ -96,9 +99,13 @@ backend/
 
 ## 5. MySQL Database Configuration
 
+A complete database creation script and setup guide are provided in [`backend/database/`](database/):
+* **Script**: [`database/create-database.sql`](database/create-database.sql) — Safely creates `lorry_fleet_db` with `utf8mb4` character set and `utf8mb4_unicode_ci` collation.
+* **Detailed Guide**: [`database/README.md`](database/README.md) — Step-by-step instructions for executing the script using MySQL Command Line Client, PowerShell, MySQL Workbench, or MySQL Shell on Windows.
+
 ### Step 1: Create Database and Dedicated User
 
-Run the following SQL commands in your MySQL client (e.g., MySQL Command Line Client, MySQL Workbench, or phpMyAdmin):
+Run the script [`database/create-database.sql`](database/create-database.sql) or execute the following SQL commands in your MySQL client (e.g., MySQL Command Line Client, MySQL Workbench):
 
 ```sql
 -- Create the database with UTF-8 character encoding
