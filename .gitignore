@@ -1,0 +1,29 @@
+﻿# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Java / Spring Boot
+target/
+*.class
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+application-local.properties
+application-local.yml
+application-secret.properties
+application-secret.yml
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
