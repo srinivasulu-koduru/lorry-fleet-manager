@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: lorry-owner-backend-test
+
+  # Exclude database autoconfiguration for automated unit/smoke tests when MySQL instance is offline
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+
+server:
+  error:
+    include-stacktrace: never
+    include-message: never
