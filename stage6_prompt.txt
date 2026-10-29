@@ -1,0 +1,131 @@
+<USER_REQUEST>
+# BHP Logistics Fleet Manager — Stage 6: Complete Driver Trip Workflow
+
+You are working on my existing private Android application project, **BHP Logistics Fleet Manager**.
+
+Your task is to implement the complete Driver Trip Workflow across the existing Android application, Spring Boot backend, and MySQL database, while preserving all existing functionality and data.
+
+This is an existing application. Do not create a new project or replace the current architecture.
+
+# 1. Existing Project Information
+
+Project root:
+`D:\lorry-fleet-manager`
+
+Android project:
+`D:\lorry-fleet-manager\android-app`
+
+Backend:
+`D:\lorry-fleet-manager\backend`
+
+Android package:
+`com.lorryowner.app`
+
+Existing technology stack:
+
+* Android: Kotlin, Jetpack Compose, MVVM.
+* Backend: Java 21, Spring Boot 3.3.4.
+* Database: MySQL 8.4.
+* Authentication: Spring Security and JWT.
+* Password hashing: BCrypt.
+* Android session storage: Existing SessionManager using Android Keystore-backed encrypted preferences.
+* Dynamic backend URL resolution: Existing `ApiConfig.getCandidateBaseUrls(sessionManager)`.
+
+Existing database:
+`lorry_fleet_db`
+
+Current trip statuses, as reported by the existing implementation:
+
+* `PLANNED`
+* `IN_PROGRESS`
+* `COMPLETED`
+* `CANCELLED`
+
+Existing Driver UI foundation includes:
+
+* `DriverDashboardScreen.kt`
+* `DriverTripsScreen.kt`
+* `DriverTripDetailsScreen.kt`
+* `DriverUpdateStatusScreen.kt`
+* `DriverProfileScreen.kt`
+* `DriverPortalHostScreen.kt`
+
+Existing driver read APIs, as reported by the previous implementation:
+
+* `GET /api/driver/dashboard`
+* `GET /api/driver/trips`
+* `GET /api/driver/trips/{id}`
+* `GET /api/driver/profile`
+
+These details are provided as project context. Verify the actual repository before relying on them.
+
+# 2. Mandatory First Step: Inspect Before Coding
+
+Before changing any file, inspect:
+
+1. Existing `Trip` entity and `TripStatus` enum.
+2. Owner trip creation and trip retrieval services.
+3. Existing driver read APIs
+<truncated 14655 bytes>
+d\outputs\apk\debug\app-debug.apk`
+
+Do not change the application ID, signing configuration, or versioning unnecessarily.
+
+# 16. Strictly Out of Scope
+
+Do not implement these features in this stage:
+
+* Live GPS tracking.
+* Background GPS location collection.
+* Live vehicle speed.
+* GPS hardware integration.
+* Automatic arrival detection.
+* Fuel recording.
+* Maintenance management.
+* Expense recording.
+* Delivery proof uploads.
+* Notifications.
+* New unrelated owner features.
+
+These remain separate stages.
+
+# 17. Final Report
+
+After implementation, provide a detailed report with:
+
+1. Files inspected.
+2. Files created and modified.
+3. Driver workflow implemented.
+4. Exact status transitions supported.
+5. API endpoints added or reused.
+6. Security checks implemented.
+7. Concurrency and duplicate-request handling.
+8. Database schema changes, explicitly stating "none" if no changes were made.
+9. Confirmation that no existing records were deleted or reset.
+10. Backend test results.
+11. Android test results.
+12. APK build result and exact output path.
+13. Any incomplete functionality or known limitations.
+14. Confirmation that existing Owner Dashboard, Add Lorry, Manage Drivers, and Owner Trip Management remain compatible.
+
+Do not automatically proceed to GPS tracking or another stage.
+
+# Final Acceptance Criteria
+
+The feature is complete only when:
+
+* The assigned driver can start an eligible trip.
+* The backend validates and persists the transition.
+* The assigned driver can complete an eligible in-progress trip.
+* Invalid transitions are rejected.
+* A driver cannot mutate another driver's trip.
+* Owner authorization remains intact.
+* Dashboard and trip lists show the actual backend status.
+* Existing trip history and database records remain intact.
+* Tests are executed and results are reported honestly.
+* The Android debug APK builds successfully.
+
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-28T22:06:59+05:30.
+</ADDITIONAL_METADATA>

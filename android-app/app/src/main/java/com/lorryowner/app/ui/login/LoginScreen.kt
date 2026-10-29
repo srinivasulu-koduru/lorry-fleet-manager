@@ -168,6 +168,34 @@ fun LoginScreen(
                         modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
                     )
 
+                    // Informational Banner (e.g., after password change)
+                    if (uiState.infoMessage != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 18.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFECFDF5))
+                                .border(1.dp, Color(0xFF10B981), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            ShieldVectorIcon(
+                                tint = Color(0xFF059669),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = uiState.infoMessage,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = Color(0xFF065F46),
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
                     // Validation / Error Message Banner (if error exists)
                     if (uiState.errorMessage != null) {
                         Row(

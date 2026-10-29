@@ -56,6 +56,7 @@ data class OwnerDashboardUiState(
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
+    val isSessionExpired: Boolean = false,
     val ownerName: String = "Owner",
     val greeting: String = GreetingHelper.getGreeting(),
     val unreadNotificationsCount: Int = 1,
@@ -74,8 +75,8 @@ class OwnerDashboardViewModel(
 
     companion object {
         private const val TAG = "OwnerDashboardVM"
-        private const val CONNECT_TIMEOUT_MS = 4000
-        private const val READ_TIMEOUT_MS = 6000
+        private const val CONNECT_TIMEOUT_MS = 10000
+        private const val READ_TIMEOUT_MS = 10000
     }
 
     var uiState by mutableStateOf(OwnerDashboardUiState())
@@ -152,9 +153,6 @@ class OwnerDashboardViewModel(
 
     fun onNavItemSelected(index: Int) {
         uiState = uiState.copy(selectedNavIndex = index)
-        if (index == 1) { // "Lorries" tab selected
-            showLorriesDialog()
-        }
     }
 
     private fun loadLorriesList() {
@@ -176,7 +174,7 @@ class OwnerDashboardViewModel(
 
         return try {
             val url = URL(endpointUrl)
-            connection = (url.openConnection() as HttpURLConnection).apply {
+            connection = (url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
@@ -244,6 +242,11 @@ class OwnerDashboardViewModel(
                     recentActivities = activitiesList
                 )
                 Result.success(Unit)
+            } else if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                Log.w(TAG, "Dashboard endpoint returned HTTP 401 Unauthorized - session expired or invalid")
+                sessionManager?.clearSession()
+                uiState = uiState.copy(isSessionExpired = true)
+                Result.failure(Exception("Session expired. Please sign in again."))
             } else {
                 Log.w(TAG, "Dashboard endpoint returned HTTP $responseCode")
                 Result.failure(Exception("HTTP $responseCode from backend"))
@@ -263,7 +266,7 @@ class OwnerDashboardViewModel(
 
         try {
             val url = URL(endpointUrl)
-            connection = (url.openConnection() as HttpURLConnection).apply {
+            connection = (url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
@@ -289,6 +292,10 @@ class OwnerDashboardViewModel(
                     )
                 }
                 uiState = uiState.copy(lorriesList = list)
+            } else if (connection.responseCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                Log.w(TAG, "Lorries endpoint returned HTTP 401 Unauthorized")
+                sessionManager?.clearSession()
+                uiState = uiState.copy(isSessionExpired = true)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch lorries: ${e.message}")

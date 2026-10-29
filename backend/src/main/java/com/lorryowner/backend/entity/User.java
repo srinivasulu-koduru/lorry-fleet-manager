@@ -4,9 +4,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -47,6 +50,16 @@ public class User {
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
+
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "assigned_lorry_id")
+    private Lorry assignedLorry;
+
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    private User owner;
 
     @Column(name = "password_updated_at", nullable = false)
     private Instant passwordUpdatedAt;
@@ -152,6 +165,22 @@ public class User {
 
     public void setActive(boolean active) {
         isActive = active;
+    }
+
+    public Lorry getAssignedLorry() {
+        return assignedLorry;
+    }
+
+    public void setAssignedLorry(Lorry assignedLorry) {
+        this.assignedLorry = assignedLorry;
+    }
+
+    public User getOwner() {
+        return owner;
+    }
+
+    public void setOwner(User owner) {
+        this.owner = owner;
     }
 
     public Instant getPasswordUpdatedAt() {

@@ -1,0 +1,535 @@
+<USER_REQUEST>
+# BHP Logistics Fleet Manager — Stage 6: Complete Driver Trip Workflow
+
+You are working on my existing private Android application project, **BHP Logistics Fleet Manager**.
+
+Your task is to implement the complete Driver Trip Workflow across the existing Android application, Spring Boot backend, and MySQL database, while preserving all existing functionality and data.
+
+This is an existing application. Do not create a new project or replace the current architecture.
+
+# 1. Existing Project Information
+
+Project root:
+`D:\lorry-fleet-manager`
+
+Android project:
+`D:\lorry-fleet-manager\android-app`
+
+Backend:
+`D:\lorry-fleet-manager\backend`
+
+Android package:
+`com.lorryowner.app`
+
+Existing technology stack:
+
+* Android: Kotlin, Jetpack Compose, MVVM.
+* Backend: Java 21, Spring Boot 3.3.4.
+* Database: MySQL 8.4.
+* Authentication: Spring Security and JWT.
+* Password hashing: BCrypt.
+* Android session storage: Existing SessionManager using Android Keystore-backed encrypted preferences.
+* Dynamic backend URL resolution: Existing `ApiConfig.getCandidateBaseUrls(sessionManager)`.
+
+Existing database:
+`lorry_fleet_db`
+
+Current trip statuses, as reported by the existing implementation:
+
+* `PLANNED`
+* `IN_PROGRESS`
+* `COMPLETED`
+* `CANCELLED`
+
+Existing Driver UI foundation includes:
+
+* `DriverDashboardScreen.kt`
+* `DriverTripsScreen.kt`
+* `DriverTripDetailsScreen.kt`
+* `DriverUpdateStatusScreen.kt`
+* `DriverProfileScreen.kt`
+* `DriverPortalHostScreen.kt`
+
+Existing driver read APIs, as reported by the previous implementation:
+
+* `GET /api/driver/dashboard`
+* `GET /api/driver/trips`
+* `GET /api/driver/trips/{id}`
+* `GET /api/driver/profile`
+
+These details are provided as project context. Verify the actual repository before relying on them.
+
+# 2. Mandatory First Step: Inspect Before Coding
+
+Before changing any file, inspect:
+
+1. Existing `Trip` entity and `TripStatus` enum.
+2. Owner trip creation and trip retrieval services.
+3. Existing driver read APIs and authorization rules.
+4. Trip repository queries and relationships.
+5. Current database schema and migration history.
+6. Android Driver Dashboard, Trips, Trip Details, and Update Status screens.
+7. Android API client, models, ViewModels, navigation, and error handling.
+8. Existing owner and driver test suites.
+
+Understand how owner-created trips are assigned to drivers and lorries.
+
+Identify all existing validation rules and lifecycle assumptions.
+
+Do not create duplicate entities, controllers, endpoints, ViewModels, API clients, or navigation destinations when suitable implementations already exist.
+
+After inspection, implement the feature using the existing architecture.
+
+# 3. Required Trip Lifecycle
+
+Implement a secure, backend-controlled workflow for drivers.
+
+The initial supported lifecycle must be:
+
+`PLANNED → IN_PROGRESS → COMPLETED`
+
+`CANCELLED` must remain supported according to the existing owner cancellation behavior.
+
+Do not allow arbitrary transitions.
+
+Rules:
+
+* `PLANNED`: The trip is scheduled but has not started.
+* `IN_PROGRESS`: The driver has started the trip.
+* `COMPLETED`: The trip has been completed and confirmed.
+* `CANCELLED`: The trip was cancelled according to existing authorized cancellation rules.
+
+Do not add `AT_DESTINATION` as a new database status merely because the UI reference contains an "At Destination" step.
+
+Instead, implement the lifecycle using the existing status model.
+
+If an arrival confirmation is required, determine whether it can be represented as a separate event or timestamp without breaking existing entity mappings.
+
+Do not introduce an unnecessary schema change. If a separate arrival field is genuinely needed, explain why before implementing it and follow the database safety requirements below.
+
+# 4. Driver Workflow — Start Trip
+
+When a driver opens an assigned trip in `PLANNED` status:
+
+1. Display trip reference, route, lorry registration, scheduled departure, and other available details.
+2. Display a clear "Start Trip" action.
+3. When tapped, show a confirmation dialog.
+4. Explain that confirming will mark the trip as started.
+5. Submit the request to the authenticated backend.
+6. Show a loading state and prevent repeated submissions.
+7. On success, refresh the trip details, driver dashboard, and trip list.
+8. Display the updated status as `IN_PROGRESS`.
+
+If the request fails, display a meaningful error and preserve the current screen state.
+
+Do not display success until the backend confirms that the operation succeeded.
+
+The operation must not create a second trip or modify the trip's origin, destination, assigned driver, or assigned lorry.
+
+# 5. Driver Workflow — Trip In Progress
+
+For an `IN_PROGRESS` trip:
+
+* Show a clear "Trip In Progress" status.
+* Display the assigned lorry and trip route.
+* Show the available scheduled departure and delivery details.
+* Provide the appropriate arrival-confirmation or trip-completion action based on the existing design.
+
+The current scope does not include live GPS hardware integration.
+
+Do not fabricate:
+
+* GPS coordinates.
+* Current speed.
+* Actual arrival times.
+* Delivery proof.
+* Fuel consumption.
+* Live vehicle location.
+
+If GPS data is unavailable, do not display fake live tracking.
+
+# 6. Destination Arrival and Trip Completion
+
+The UI reference contains:
+
+* Start Trip.
+* At Destination.
+* Trip Completed.
+
+However, the existing reported backend status model has no `AT_DESTINATION` value.
+
+Therefore:
+
+1. Preserve the existing `TripStatus` enum unless repository inspection proves a compatible change is necessary.
+2. Do not invent a new status or silently change existing enum values.
+3. If the existing trip model already supports an arrival timestamp or delivery event, reuse it after verifying its meaning.
+4. Otherwise, use a clearly defined arrival-confirmation step in the UI only if it can be implemented consistently with the existing backend model.
+5. Implement a secure final completion action that transitions an eligible trip from `IN_PROGRESS` to `COMPLETED`.
+
+Before completion, display a confirmation dialog.
+
+The dialog should clearly explain that completing the trip records the trip as finished.
+
+On confirmation:
+
+* Send the request to the backend.
+* Validate the transition on the backend.
+* Persist the final status.
+* Return the updated trip details.
+* Refresh the relevant Android screens.
+
+Do not mark a trip completed just because the user opened a screen or tapped a button that failed to reach the backend.
+
+If a separate arrival event is required, document the design and any schema implications in the final report.
+
+# 7. Backend API Design
+
+Inspect existing endpoints first.
+
+Reuse the current controller, service, repository, DTOs, security configuration, and naming conventions wherever possible.
+
+If equivalent mutation endpoints do not exist, implement appropriate authenticated driver endpoints, for example:
+
+* `POST /api/driver/trips/{id}/start`
+* `POST /api/driver/trips/{id}/complete`
+
+These are proposed endpoint names, not a requirement to duplicate endpoints that already exist.
+
+If arrival confirmation can be implemented without changing the status enum, select a compatible endpoint and data model only after inspecting the existing code.
+
+Use appropriate HTTP methods and status codes.
+
+Possible responses:
+
+* `200 OK` for a successful transition.
+* `400 Bad Request` for invalid transitions or invalid request data.
+* `401 Unauthorized` for unauthenticated requests.
+* `403 Forbidden` for an authenticated user without the required role.
+* `404 Not Found` when the trip is not available to the authenticated driver.
+* `409 Conflict` if the trip's current status conflicts with the requested transition, provided this matches the existing API error conventions.
+
+Keep API response formats consistent with the existing application.
+
+# 8. Backend Security — Mandatory
+
+Every mutation must be authorized and validated on the server.
+
+Requirements:
+
+1. Require `ROLE_DRIVER` for driver mutation endpoints.
+2. Derive the driver identity from the validated Spring Security authentication context.
+3. Never trust a client-supplied driver ID or owner ID to establish identity.
+4. Load the authenticated driver's database record through the existing user/driver relationship.
+5. Verify that the requested trip belongs to that authenticated driver.
+6. Reject attempts to start or complete another driver's trip.
+7. Reject attempts to mutate trips that do not belong to the authenticated driver.
+8. Reject invalid status transitions.
+9. Prevent unauthorized drivers from changing the trip's assigned lorry or driver.
+10. Preserve owner authorization and existing owner trip-management behavior.
+11. Preserve JWT validation and existing security filters.
+12. Never disable authentication for convenience.
+13. Never expose tokens, passwords, password hashes, SQL errors, or stack traces in API responses.
+14. Use DTOs rather than exposing sensitive entity internals.
+15. Apply transaction management where needed to keep status updates consistent.
+
+The Android client must not be treated as the security boundary.
+
+Even if the client hides a button, the backend must independently reject unauthorized requests.
+
+# 9. Concurrency and Duplicate Requests
+
+Protect trip transitions against duplicate requests and race conditions.
+
+Examples:
+
+* Two rapid Start Trip taps must not create inconsistent results.
+* A retry after a timeout must not create a second trip.
+* Two requests must not cause a completed trip to return to `IN_PROGRESS`.
+* A stale Android screen must not overwrite a newer trip status.
+
+Use appropriate transaction boundaries and, where justified by the existing architecture, optimistic locking, pessimistic locking, or conditional updates.
+
+Do not introduce complicated locking mechanisms without a demonstrated need.
+
+For repeated requests, return a consistent response or a meaningful conflict error according to the established API conventions.
+
+The backend must remain the source of truth.
+
+# 10. Android UI Integration
+
+Integrate the workflow into the existing Driver UI.
+
+Do not redesign the entire Driver Portal.
+
+## A. Driver Dashboard
+
+Use the existing dashboard.
+
+* Display the current trip and its actual backend status.
+* Refresh the current trip after a successful status transition.
+* Refresh current, upcoming, and completed trip counts.
+* Show an appropriate empty state when there is no active trip.
+
+## B. My Trips
+
+Preserve the existing Current, Upcoming, and Completed tabs.
+
+Ensure that a trip moves into the correct category after the backend confirms its status change.
+
+Do not rely solely on local UI state to change trip status.
+
+## C. Trip Details
+
+Display:
+
+* Trip reference.
+* Origin and destination.
+* Assigned lorry.
+* Scheduled departure.
+* Planned delivery time, if available.
+* Load type and remarks, if available.
+* Current trip status.
+
+Show Start Trip only when the trip is eligible.
+
+Show the appropriate completion action only when the trip is eligible.
+
+Hide or disable unavailable actions appropriately, but enforce all permissions on the backend.
+
+## D. Update Trip Status
+
+Connect the existing Update Trip Status screen to the real backend workflow.
+
+The UI should reflect:
+
+* Trip Assigned.
+* Start Trip.
+* Trip In Progress.
+* Arrival confirmation, if supported.
+* Trip Completed.
+
+Do not claim that arrival confirmation is persisted if it is only a UI step.
+
+Show loading, success, failure, and confirmation states.
+
+## E. Refresh and Navigation
+
+After a successful status change:
+
+* Refresh the trip details.
+* Refresh the My Trips list.
+* Refresh dashboard counts.
+* Keep navigation predictable.
+* Prevent duplicate network submissions.
+* Handle the user returning to the screen after a network failure.
+
+Reuse existing ViewModels and API infrastructure when possible.
+
+Do not create a second session manager or a duplicate API client.
+
+# 11. Database Safety — Absolutely Mandatory
+
+Existing database:
+`lorry_fleet_db`
+
+The current configuration must remain:
+
+`spring.jpa.hibernate.ddl-auto=validate`
+
+Do not:
+
+* Drop or recreate the database.
+* Truncate tables.
+* Delete existing owners, drivers, lorries, or trips.
+* Clear existing trip history.
+* Reset IDs or sequences.
+* Change existing database credentials.
+* Change the JWT secret.
+* Modify foreign keys unnecessarily.
+* Rename or remove existing columns.
+* Change existing enum values in a way that breaks stored records.
+* Run destructive SQL.
+* Seed dummy data automatically.
+* Blindly rerun migrations that may already have been applied.
+
+First inspect the actual schema and existing migration files.
+
+Prefer implementing the workflow using the existing trip table and status column.
+
+If a schema change is genuinely necessary, document:
+
+* The exact reason.
+* The table and column affected.
+* Whether existing records are affected.
+* Backward compatibility.
+* The migration and rollback strategy.
+
+Do not execute an irreversible or destructive migration without explicit approval.
+
+Existing data must remain intact.
+
+# 12. Trip History and Data Integrity
+
+A completed trip must remain available in the driver's completed trip history.
+
+Do not delete or recreate a trip when its status changes.
+
+Preserve:
+
+* Trip ID.
+* Trip reference.
+* Assigned driver.
+* Assigned lorry.
+* Origin.
+* Destination.
+* Scheduled departure.
+* Planned delivery information.
+* Load type.
+* Remarks.
+* Owner relationship.
+
+Modify only the fields required by the approved workflow.
+
+If the existing model contains actual start or completion timestamps, inspect and reuse them according to their existing semantics.
+
+Do not overwrite scheduled timestamps with actual timestamps.
+
+Do not fabricate actual times or location data.
+
+If new timestamp columns are necessary, explain the requirement and wait for approval before modifying the schema.
+
+# 13. Driver and Owner Workflow Compatibility
+
+Owner trip management must continue working.
+
+The owner must still be able to:
+
+* Create trips using the existing workflow.
+* Assign eligible drivers and lorries according to current rules.
+* View trip details through existing owner APIs.
+* View accurate trip statuses after driver actions.
+
+Do not weaken owner/driver separation.
+
+Do not let a driver change trip assignment.
+
+Do not allow the driver workflow to bypass existing lorry or driver ownership checks.
+
+If an existing business rule conflicts with the proposed workflow, inspect and document it rather than silently changing it.
+
+# 14. Testing Requirements
+
+Add backend tests for the new mutation endpoints.
+
+At minimum, cover:
+
+1. An authenticated assigned driver can start an eligible planned trip.
+2. Starting a trip changes the persisted status correctly.
+3. An authenticated assigned driver can complete an eligible in-progress trip.
+4. Completing a trip changes the persisted status correctly.
+5. A driver cannot start another driver's trip.
+6. A driver cannot complete another driver's trip.
+7. An owner cannot access driver-only mutation endpoints.
+8. Unauthenticated requests are rejected.
+9. Starting an already started trip is handled consistently.
+10. Completing a planned trip is rejected.
+11. Starting a completed trip is rejected.
+12. A cancelled trip cannot be started or completed through an invalid transition.
+13. Repeated requests do not create duplicate trips.
+14. Invalid request data is rejected.
+15. Existing owner trip creation and retrieval remain compatible.
+
+Add or update Android tests for:
+
+* Eligible actions based on status.
+* Confirmation dialogs.
+* Loading state.
+* Duplicate tap prevention.
+* Successful status refresh.
+* Error handling.
+* Empty states.
+* Navigation after status changes.
+
+Use the existing test infrastructure and isolated test data.
+
+Do not add test records to the production database.
+
+Run the complete relevant backend and Android test suites.
+
+Do not claim a test passed unless it actually ran and the result was verified.
+
+# 15. Build and APK
+
+After implementation:
+
+1. Run backend tests.
+2. Build the backend.
+3. Run Android unit tests.
+4. Build the Android debug APK.
+5. Inspect the actual command output.
+6. Report any test or build failure accurately.
+
+Expected standard debug APK path:
+
+`D:\lorry-fleet-manager\android-app\app\build\outputs\apk\debug\app-debug.apk`
+
+Do not change the application ID, signing configuration, or versioning unnecessarily.
+
+# 16. Strictly Out of Scope
+
+Do not implement these features in this stage:
+
+* Live GPS tracking.
+* Background GPS location collection.
+* Live vehicle speed.
+* GPS hardware integration.
+* Automatic arrival detection.
+* Fuel recording.
+* Maintenance management.
+* Expense recording.
+* Delivery proof uploads.
+* Notifications.
+* New unrelated owner features.
+
+These remain separate stages.
+
+# 17. Final Report
+
+After implementation, provide a detailed report with:
+
+1. Files inspected.
+2. Files created and modified.
+3. Driver workflow implemented.
+4. Exact status transitions supported.
+5. API endpoints added or reused.
+6. Security checks implemented.
+7. Concurrency and duplicate-request handling.
+8. Database schema changes, explicitly stating "none" if no changes were made.
+9. Confirmation that no existing records were deleted or reset.
+10. Backend test results.
+11. Android test results.
+12. APK build result and exact output path.
+13. Any incomplete functionality or known limitations.
+14. Confirmation that existing Owner Dashboard, Add Lorry, Manage Drivers, and Owner Trip Management remain compatible.
+
+Do not automatically proceed to GPS tracking or another stage.
+
+# Final Acceptance Criteria
+
+The feature is complete only when:
+
+* The assigned driver can start an eligible trip.
+* The backend validates and persists the transition.
+* The assigned driver can complete an eligible in-progress trip.
+* Invalid transitions are rejected.
+* A driver cannot mutate another driver's trip.
+* Owner authorization remains intact.
+* Dashboard and trip lists show the actual backend status.
+* Existing trip history and database records remain intact.
+* Tests are executed and results are reported honestly.
+* The Android debug APK builds successfully.
+
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-28T22:06:59+05:30.
+</ADDITIONAL_METADATA>

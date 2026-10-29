@@ -37,6 +37,15 @@ class UserControllerTest {
     private UserRepository userRepository;
 
     @Autowired
+    private com.lorryowner.backend.repository.LorryRepository lorryRepository;
+
+    @Autowired
+    private com.lorryowner.backend.repository.TripRepository tripRepository;
+
+    @Autowired
+    private com.lorryowner.backend.repository.MaintenanceRecordRepository maintenanceRecordRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -47,6 +56,9 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
+        maintenanceRecordRepository.deleteAll();
+        tripRepository.deleteAll();
+        lorryRepository.deleteAll();
         userRepository.deleteAll();
 
         testUser = new User(
@@ -142,5 +154,40 @@ class UserControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    @DisplayName("POST /api/owner/change-password with valid credentials succeeds via owner route")
+    void changePassword_viaOwnerRoute_shouldSucceed() throws Exception {
+        ChangePasswordRequest request = new ChangePasswordRequest(
+                "CurrentPass123!",
+                "BrandNewSecurePass99!",
+                "BrandNewSecurePass99!"
+        );
+
+        mockMvc.perform(post("/api/owner/change-password")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password changed successfully. Existing session tokens have been invalidated."));
+    }
+
+    @Test
+    @DisplayName("GET /api/owner/me with valid JWT returns current owner profile")
+    void getCurrentUser_viaOwnerRoute_shouldReturnProfile() throws Exception {
+        mockMvc.perform(get("/api/owner/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwtToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("testuser"))
+                .andExpect(jsonPath("$.role").value("OWNER"));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        maintenanceRecordRepository.deleteAll();
+        tripRepository.deleteAll();
+        lorryRepository.deleteAll();
+        userRepository.deleteAll();
     }
 }

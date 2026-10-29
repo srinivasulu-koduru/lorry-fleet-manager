@@ -28,6 +28,7 @@ data class LoginUiState(
     val isPasswordVisible: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
+    val infoMessage: String? = null,
     val isAuthenticated: Boolean = false,
     val userRole: UserRole? = null,
     val isServerSettingsDialogVisible: Boolean = false,
@@ -54,8 +55,8 @@ class LoginViewModel(
 
     companion object {
         private const val TAG = "LoginViewModel"
-        private const val CONNECT_TIMEOUT_MS = 3000
-        private const val READ_TIMEOUT_MS = 6000
+        private const val CONNECT_TIMEOUT_MS = 5000
+        private const val READ_TIMEOUT_MS = 10000
     }
 
     // Active backend base URL resolved dynamically via ApiConfig
@@ -89,14 +90,16 @@ class LoginViewModel(
     fun onUsernameChanged(newValue: String) {
         uiState = uiState.copy(
             usernameInput = newValue,
-            errorMessage = null
+            errorMessage = null,
+            infoMessage = null
         )
     }
 
     fun onPasswordChanged(newValue: String) {
         uiState = uiState.copy(
             passwordInput = newValue,
-            errorMessage = null
+            errorMessage = null,
+            infoMessage = null
         )
     }
 
@@ -163,6 +166,7 @@ class LoginViewModel(
 
     private fun performBackendLogin(username: String, password: String): LoginResult {
         val candidateUrls = ApiConfig.getCandidateBaseUrls(sessionManager)
+        val isEmu = ApiConfig.isEmulator()
 
         var lastErrorResult: LoginResult? = null
 
@@ -177,7 +181,7 @@ class LoginViewModel(
             // If it was an auth rejection (401/400/403), don't try another URL—it's a valid server response
             if (result is LoginResult.Failure &&
                 !result.message.contains("Cannot connect") &&
-                !result.message.contains("Connection timed out") &&
+                !result.message.contains("timed out") &&
                 !result.message.contains("failed to connect") &&
                 !result.message.contains("Connection refused")
             ) {
@@ -188,14 +192,17 @@ class LoginViewModel(
             lastErrorResult = result
         }
 
-        return lastErrorResult ?: LoginResult.Failure("Cannot connect to backend server. Please verify network connectivity.")
+        return lastErrorResult ?: LoginResult.Failure(
+            if (isEmu) "Cannot connect to backend at ${ApiConfig.EMULATOR_BASE_URL}. Ensure Spring Boot is running on port 8080."
+            else "Cannot connect to backend server. Please verify network connectivity."
+        )
     }
 
     private fun attemptLoginAtUrl(baseUrl: String, username: String, password: String): LoginResult {
         var connection: HttpURLConnection? = null
         return try {
             val url = URL("$baseUrl/api/auth/login")
-            connection = (url.openConnection() as HttpURLConnection).apply {
+            connection = (url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
                 requestMethod = "POST"
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "application/json")
@@ -257,25 +264,38 @@ class LoginViewModel(
                 if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
                     LoginResult.Failure(if (serverMsg.isNotEmpty()) serverMsg else "Invalid username or password. Please try again.")
                 } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-                    LoginResult.Failure("Backend authentication endpoint (/api/auth/login) not found. Verify server status.")
+                    LoginResult.Failure("Backend authentication endpoint (/api/auth/login) not found on $baseUrl. Verify server status.")
                 } else {
                     LoginResult.Failure(if (serverMsg.isNotEmpty()) serverMsg else "Server returned response code $responseCode. Please verify backend status.")
                 }
             }
         } catch (e: java.net.ConnectException) {
-            LoginResult.Failure("Cannot connect to backend server at $baseUrl: ${e.message}")
+            Log.e(TAG, "Connection refused at $baseUrl: ${e.message}", e)
+            val hint = if (ApiConfig.isEmulator()) {
+                "Cannot connect to backend server at $baseUrl. Ensure Spring Boot is running on port 8080."
+            } else {
+                "Cannot connect to backend server at $baseUrl. Check network connection and ensure backend is running."
+            }
+            LoginResult.Failure(hint)
         } catch (e: java.net.SocketTimeoutException) {
-            LoginResult.Failure("Connection timed out at $baseUrl: ${e.message}")
+            Log.e(TAG, "Socket timeout at $baseUrl: ${e.message}", e)
+            val hint = if (ApiConfig.isEmulator()) {
+                "Connection to backend timed out at $baseUrl. Ensure Spring Boot is running and responsive on port 8080."
+            } else {
+                "Connection to backend timed out at $baseUrl. Verify phone and laptop are on the same Wi-Fi network."
+            }
+            LoginResult.Failure(hint)
         } catch (e: Exception) {
+            Log.e(TAG, "Exception during login at $baseUrl: ${e.message}", e)
             LoginResult.Failure("Authentication request failed at $baseUrl: ${e.localizedMessage ?: "Unknown network error"}")
         } finally {
             connection?.disconnect()
         }
     }
 
-    fun logout() {
+    fun logout(infoMessage: String? = null) {
         sessionManager?.clearSession()
-        uiState = LoginUiState()
+        uiState = LoginUiState(infoMessage = infoMessage)
     }
 
     fun clearError() {
@@ -288,6 +308,7 @@ class LoginViewModel(
             serverUrlInput = ApiConfig.getBaseUrl(sessionManager)
         )
     }
+
 
     fun dismissServerSettingsDialog() {
         uiState = uiState.copy(isServerSettingsDialogVisible = false)

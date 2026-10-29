@@ -17,6 +17,11 @@ public record CreateDriverRequest(
         String fullName,
 
         String phoneNumber,
-        String licenseNumber
+        String licenseNumber,
+        String assignedLorryRegistration,
+        Long assignedLorryId
 ) {
+    public CreateDriverRequest(String username, String password, String fullName, String phoneNumber, String licenseNumber) {
+        this(username, password, fullName, phoneNumber, licenseNumber, null, null);
+    }
 }

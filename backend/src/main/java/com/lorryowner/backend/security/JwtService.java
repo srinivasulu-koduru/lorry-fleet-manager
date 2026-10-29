@@ -30,22 +30,24 @@ public class JwtService {
     private final SecretKey signingKey;
     private final long expirationMs;
 
+    private static final String DEFAULT_DEV_SECRET = "bhp-logistics-fleet-manager-dev-jwt-secret-key-min-32-bytes!";
+
     public JwtService(
             @Value("${jwt.secret:}") String configuredSecret,
             @Value("${jwt.expiration-ms:604800000}") long expirationMs
     ) {
         this.expirationMs = expirationMs;
 
+        String effectiveSecret = (configuredSecret != null && configuredSecret.trim().length() >= 32)
+                ? configuredSecret.trim()
+                : DEFAULT_DEV_SECRET;
+
+        this.signingKey = Keys.hmacShaKeyFor(effectiveSecret.getBytes(StandardCharsets.UTF_8));
+
         if (configuredSecret != null && configuredSecret.trim().length() >= 32) {
-            this.signingKey = Keys.hmacShaKeyFor(configuredSecret.trim().getBytes(StandardCharsets.UTF_8));
             log.info("JWT service initialized with configured secret key.");
         } else {
-            // Safe fallback for development/testing when JWT_SECRET is not explicitly provided in environment
-            byte[] randomKey = new byte[32];
-            new SecureRandom().nextBytes(randomKey);
-            this.signingKey = Keys.hmacShaKeyFor(randomKey);
-            log.warn("JWT_SECRET environment variable not provided or shorter than 32 characters. " +
-                    "Using securely generated runtime ephemeral key for development. Set JWT_SECRET in production.");
+            log.info("JWT service initialized with consistent development key. Set JWT_SECRET in production.");
         }
     }
 

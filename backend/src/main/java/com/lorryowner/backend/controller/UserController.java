@@ -19,7 +19,7 @@ import java.util.Map;
  * Controller managing authenticated user self-service actions (profile inspection, password modification).
  */
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping({"/api/users", "/api/owner"})
 public class UserController {
 
     private final UserService userService;

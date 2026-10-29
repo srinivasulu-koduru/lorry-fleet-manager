@@ -52,8 +52,8 @@ management:
 # JWT Configuration
 jwt:
   # Secret key for signing tokens (minimum 256 bits / 32 characters)
-  # Injected strictly via environment variable
-  secret: ${JWT_SECRET:}
+  # Uses environment variable JWT_SECRET if defined, or consistent development fallback key
+  secret: ${JWT_SECRET:bhp-logistics-fleet-manager-dev-jwt-secret-key-min-32-bytes!}
   # Token validity in milliseconds (default: 7 days = 604,800,000 ms)
   expiration-ms: ${JWT_EXPIRATION_MS:604800000}
 

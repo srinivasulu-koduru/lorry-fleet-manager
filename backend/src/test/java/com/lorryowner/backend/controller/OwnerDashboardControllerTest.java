@@ -38,6 +38,12 @@ class OwnerDashboardControllerTest {
     private LorryRepository lorryRepository;
 
     @Autowired
+    private com.lorryowner.backend.repository.TripRepository tripRepository;
+
+    @Autowired
+    private com.lorryowner.backend.repository.MaintenanceRecordRepository maintenanceRecordRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -48,6 +54,8 @@ class OwnerDashboardControllerTest {
 
     @BeforeEach
     void setUp() {
+        maintenanceRecordRepository.deleteAll();
+        tripRepository.deleteAll();
         userRepository.deleteAll();
         lorryRepository.deleteAll();
 
@@ -135,5 +143,13 @@ class OwnerDashboardControllerTest {
         mockMvc.perform(get("/api/owner/dashboard"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        maintenanceRecordRepository.deleteAll();
+        tripRepository.deleteAll();
+        userRepository.deleteAll();
+        lorryRepository.deleteAll();
     }
 }

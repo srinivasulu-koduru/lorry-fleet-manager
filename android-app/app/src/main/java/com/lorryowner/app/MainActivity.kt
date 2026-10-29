@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.security.SessionManager
 import com.lorryowner.app.ui.components.ShieldVectorIcon
+import com.lorryowner.app.ui.driver.DriverPortalHostScreen
 import com.lorryowner.app.ui.login.LoginScreen
 import com.lorryowner.app.ui.login.LoginViewModel
 import com.lorryowner.app.ui.login.UserRole
@@ -75,13 +76,13 @@ fun MainAppContent() {
                 when (uiState.userRole) {
                     UserRole.OWNER -> OwnerDashboardScreen(
                         sessionManager = sessionManager,
-                        onLogout = { loginViewModel.logout() },
+                        onLogout = { message -> loginViewModel.logout(message) },
                         modifier = Modifier.fillMaxSize()
                     )
-                    UserRole.DRIVER -> DriverDashboardScreen(
-                        username = uiState.usernameInput.ifEmpty { "Driver" },
+                    UserRole.DRIVER -> DriverPortalHostScreen(
+                        sessionManager = sessionManager,
                         onLogout = { loginViewModel.logout() },
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.fillMaxSize()
                     )
                     else -> LoginScreen(
                         viewModel = loginViewModel,
@@ -95,109 +96,6 @@ fun MainAppContent() {
                         // Role-based navigation managed automatically via uiState
                     }
                 )
-            }
-        }
-    }
-}
-
-
-/**
- * Driver Dashboard Screen shown when authenticated user role is DRIVER.
- */
-@Composable
-fun DriverDashboardScreen(
-    username: String,
-    onLogout: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .fillMaxSize()
-            .background(BhpDeepTeal)
-            .padding(24.dp)
-    ) {
-        Surface(
-            color = BhpCardWhite,
-            shape = RoundedCornerShape(24.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, BhpInputBorder, RoundedCornerShape(24.dp))
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(28.dp)
-            ) {
-                Text(
-                    text = "BHP Logistics",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = BhpDarkForestGreen
-                    )
-                )
-                Text(
-                    text = "DRIVER OPERATIONS PORTAL",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = BhpTextMuted,
-                        letterSpacing = 1.sp
-                    ),
-                    modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
-                )
-
-                Text(
-                    text = "Welcome, Driver $username",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = BhpTextBlack
-                    )
-                )
-
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = BhpInputBg),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 20.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            ShieldVectorIcon(tint = BhpDarkForestGreen, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Authenticated Role: DRIVER",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = BhpDarkForestGreen
-                                )
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Active Trip: Ready for dispatch",
-                            style = MaterialTheme.typography.bodySmall.copy(color = BhpTextBlack)
-                        )
-                    }
-                }
-
-                Button(
-                    onClick = onLogout,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BhpDarkForestGreen,
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Text(
-                        text = "Sign Out / End Shift",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                }
             }
         }
     }

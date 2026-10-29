@@ -35,3 +35,10 @@ val BhpAvatarCream = Color(0xFFFFF5EB)     // Top avatar background
 val BhpAvatarBorder = Color(0xFFE8C898)    // Top avatar border
 val BhpNotificationDot = Color(0xFFF59E0B) // Orange/gold notification badge dot
 val BhpDieselOrange = Color(0xFFEA580C)    // Diesel action & dot orange
+
+// Manage Drivers Colors (Matched to Reference Image)
+val BhpDriverBlue = Color(0xFF1976D2)       // "+ Add New Driver" and "View Details" action buttons
+val BhpDriverMetricBg = Color(0xFFEFF6FF)   // 2x2 Driver summary card background
+val BhpDriverMetricIconBg = Color(0xFFDBEAFE)// Metric icon rounded square background
+val BhpDriverInactiveBg = Color(0xFFFEE2E2) // Inactive driver badge background
+val BhpDriverInactiveText = Color(0xFFDC2626)// Inactive driver badge text

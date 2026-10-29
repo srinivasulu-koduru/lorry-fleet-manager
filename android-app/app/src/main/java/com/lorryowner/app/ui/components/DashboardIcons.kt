@@ -17,16 +17,18 @@ import com.lorryowner.app.ui.theme.BhpNotificationDot
 
 @Composable
 fun DashboardTruckIcon(
-    tint: Color,
+    tint: Color = Color.White,
+    color: Color = tint,
     modifier: Modifier = Modifier.size(20.dp)
 ) {
+    val effectiveTint = if (color != tint) color else tint
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
 
         // Cargo Container Box
         drawRoundRect(
-            color = tint,
+            color = effectiveTint,
             topLeft = Offset(w * 0.08f, h * 0.22f),
             size = Size(w * 0.54f, h * 0.48f),
             cornerRadius = CornerRadius(w * 0.05f, w * 0.05f),
@@ -44,7 +46,7 @@ fun DashboardTruckIcon(
         }
         drawPath(
             path = cabPath,
-            color = tint,
+            color = effectiveTint,
             style = Stroke(width = w * 0.08f)
         )
 
@@ -58,13 +60,13 @@ fun DashboardTruckIcon(
         }
         drawPath(
             path = windowPath,
-            color = tint,
+            color = effectiveTint,
             style = Fill
         )
 
         // Left Wheel
         drawCircle(
-            color = tint,
+            color = effectiveTint,
             radius = w * 0.10f,
             center = Offset(w * 0.26f, h * 0.76f),
             style = Fill
@@ -72,7 +74,7 @@ fun DashboardTruckIcon(
 
         // Right Wheel
         drawCircle(
-            color = tint,
+            color = effectiveTint,
             radius = w * 0.10f,
             center = Offset(w * 0.78f, h * 0.76f),
             style = Fill
@@ -129,16 +131,18 @@ fun NotificationBellIcon(
 
 @Composable
 fun CheckmarkCircleIcon(
-    tint: Color,
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
     modifier: Modifier = Modifier.size(20.dp)
 ) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
 
         // Circle
         drawCircle(
-            color = tint,
+            color = effectiveTint,
             radius = w * 0.44f,
             center = Offset(w * 0.50f, h * 0.50f),
             style = Stroke(width = w * 0.10f)
@@ -152,7 +156,7 @@ fun CheckmarkCircleIcon(
         }
         drawPath(
             path = checkPath,
-            color = tint,
+            color = effectiveTint,
             style = Stroke(width = w * 0.10f)
         )
     }
@@ -160,16 +164,18 @@ fun CheckmarkCircleIcon(
 
 @Composable
 fun ClockTimerIcon(
-    tint: Color,
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
     modifier: Modifier = Modifier.size(20.dp)
 ) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
 
         // Circle
         drawCircle(
-            color = tint,
+            color = effectiveTint,
             radius = w * 0.44f,
             center = Offset(w * 0.50f, h * 0.50f),
             style = Stroke(width = w * 0.10f)
@@ -177,13 +183,13 @@ fun ClockTimerIcon(
 
         // Hands
         drawLine(
-            color = tint,
+            color = effectiveTint,
             start = Offset(w * 0.50f, h * 0.50f),
             end = Offset(w * 0.50f, h * 0.26f),
             strokeWidth = w * 0.09f
         )
         drawLine(
-            color = tint,
+            color = effectiveTint,
             start = Offset(w * 0.50f, h * 0.50f),
             end = Offset(w * 0.68f, h * 0.50f),
             strokeWidth = w * 0.09f
@@ -193,9 +199,11 @@ fun ClockTimerIcon(
 
 @Composable
 fun FormatListIcon(
-    tint: Color,
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
     modifier: Modifier = Modifier.size(20.dp)
 ) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
@@ -204,13 +212,13 @@ fun FormatListIcon(
         for (y in yCoords) {
             // Bullet
             drawCircle(
-                color = tint,
+                color = effectiveTint,
                 radius = w * 0.05f,
                 center = Offset(w * 0.22f, h * y)
             )
             // Line
             drawLine(
-                color = tint,
+                color = effectiveTint,
                 start = Offset(w * 0.36f, h * y),
                 end = Offset(w * 0.82f, h * y),
                 strokeWidth = w * 0.09f
@@ -221,9 +229,11 @@ fun FormatListIcon(
 
 @Composable
 fun LocationPinIcon(
-    tint: Color,
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
     modifier: Modifier = Modifier.size(24.dp)
 ) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
@@ -238,13 +248,13 @@ fun LocationPinIcon(
         }
         drawPath(
             path = pinPath,
-            color = tint,
+            color = effectiveTint,
             style = Stroke(width = w * 0.08f)
         )
 
         // Center dot
         drawCircle(
-            color = tint,
+            color = effectiveTint,
             radius = w * 0.12f,
             center = Offset(w * 0.50f, h * 0.36f)
         )
@@ -348,9 +358,11 @@ fun GasPumpIcon(
 
 @Composable
 fun ChevronRightIcon(
-    tint: Color,
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
     modifier: Modifier = Modifier.size(16.dp)
 ) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
@@ -362,7 +374,7 @@ fun ChevronRightIcon(
         }
         drawPath(
             path = path,
-            color = tint,
+            color = effectiveTint,
             style = Stroke(width = w * 0.12f)
         )
     }
@@ -513,5 +525,495 @@ fun GreetingTruckGraphic(
                 center = center
             )
         }
+    }
+}
+
+/**
+ * Driver / Chauffeur Cap Icon used in Manage Drivers top card and Quick Actions.
+ */
+@Composable
+fun DriverCapIcon(
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Cap Crown (Dome)
+        val capPath = Path().apply {
+            moveTo(w * 0.22f, h * 0.32f)
+            cubicTo(w * 0.22f, h * 0.16f, w * 0.78f, h * 0.16f, w * 0.78f, h * 0.32f)
+            close()
+        }
+        drawPath(path = capPath, color = effectiveTint)
+
+        // Cap Visor / Peak
+        val visorPath = Path().apply {
+            moveTo(w * 0.18f, h * 0.34f)
+            lineTo(w * 0.82f, h * 0.34f)
+            cubicTo(w * 0.76f, h * 0.44f, w * 0.24f, h * 0.44f, w * 0.18f, h * 0.34f)
+            close()
+        }
+        drawPath(path = visorPath, color = effectiveTint)
+
+        // Driver Head / Face
+        drawCircle(
+            color = effectiveTint,
+            radius = w * 0.18f,
+            center = Offset(w * 0.50f, h * 0.48f)
+        )
+
+        // Shoulders / Torso
+        val bodyPath = Path().apply {
+            moveTo(w * 0.18f, h * 0.88f)
+            cubicTo(w * 0.24f, h * 0.68f, w * 0.76f, h * 0.68f, w * 0.82f, h * 0.88f)
+            close()
+        }
+        drawPath(path = bodyPath, color = effectiveTint)
+    }
+}
+
+/**
+ * Checkbox square with checkmark inside, matching "Active Drivers" card.
+ */
+@Composable
+fun CheckSquareIcon(
+    tint: Color,
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Square container
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(w * 0.12f, h * 0.12f),
+            size = Size(w * 0.76f, h * 0.76f),
+            cornerRadius = CornerRadius(w * 0.16f, w * 0.16f)
+        )
+
+        // Checkmark inside (white)
+        val checkPath = Path().apply {
+            moveTo(w * 0.30f, h * 0.50f)
+            lineTo(w * 0.44f, h * 0.64f)
+            lineTo(w * 0.70f, h * 0.36f)
+        }
+        drawPath(
+            path = checkPath,
+            color = Color.White,
+            style = Stroke(width = w * 0.10f, cap = StrokeCap.Round)
+        )
+    }
+}
+
+/**
+ * Trip Route Icon (Path with pin), matching "Completed Trips" card.
+ */
+@Composable
+fun TripRouteIcon(
+    tint: Color,
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Origin dot
+        drawCircle(
+            color = tint,
+            radius = w * 0.09f,
+            center = Offset(w * 0.28f, h * 0.74f)
+        )
+
+        // Curved Route Path
+        val path = Path().apply {
+            moveTo(w * 0.34f, h * 0.74f)
+            cubicTo(w * 0.60f, h * 0.74f, w * 0.30f, h * 0.44f, w * 0.68f, h * 0.40f)
+        }
+        drawPath(
+            path = path,
+            color = tint,
+            style = Stroke(width = w * 0.08f, cap = StrokeCap.Round)
+        )
+
+        // Destination Pin
+        val pinPath = Path().apply {
+            moveTo(w * 0.72f, h * 0.50f)
+            cubicTo(w * 0.60f, h * 0.38f, w * 0.56f, h * 0.30f, w * 0.56f, h * 0.24f)
+            cubicTo(w * 0.56f, h * 0.14f, w * 0.64f, h * 0.08f, w * 0.72f, h * 0.08f)
+            cubicTo(w * 0.80f, h * 0.08f, w * 0.88f, h * 0.14f, w * 0.88f, h * 0.24f)
+            cubicTo(w * 0.88f, h * 0.30f, w * 0.84f, h * 0.38f, w * 0.72f, h * 0.50f)
+            close()
+        }
+        drawPath(path = pinPath, color = tint)
+
+        drawCircle(
+            color = Color.White,
+            radius = w * 0.05f,
+            center = Offset(w * 0.72f, h * 0.24f)
+        )
+    }
+}
+
+/**
+ * Distance Pin Icon, matching "Total Distance" card.
+ */
+@Composable
+fun DistancePinIcon(
+    tint: Color,
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        val pinPath = Path().apply {
+            moveTo(w * 0.50f, h * 0.88f)
+            cubicTo(w * 0.26f, h * 0.62f, w * 0.18f, h * 0.44f, w * 0.18f, h * 0.34f)
+            cubicTo(w * 0.18f, h * 0.16f, w * 0.32f, h * 0.08f, w * 0.50f, h * 0.08f)
+            cubicTo(w * 0.68f, h * 0.08f, w * 0.82f, h * 0.16f, w * 0.82f, h * 0.34f)
+            cubicTo(w * 0.82f, h * 0.44f, w * 0.74f, h * 0.62f, w * 0.50f, h * 0.88f)
+            close()
+        }
+        drawPath(path = pinPath, color = tint)
+
+        drawCircle(
+            color = Color.White,
+            radius = w * 0.11f,
+            center = Offset(w * 0.50f, h * 0.34f)
+        )
+    }
+}
+
+/**
+ * Standard back arrow icon for top navigation bar.
+ */
+@Composable
+fun BackArrowIcon(
+    tint: Color,
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Horizontal Stem
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.80f, h * 0.50f),
+            end = Offset(w * 0.22f, h * 0.50f),
+            strokeWidth = w * 0.10f,
+            cap = StrokeCap.Round
+        )
+
+        // Arrow head chevron
+        val arrowPath = Path().apply {
+            moveTo(w * 0.46f, h * 0.26f)
+            lineTo(w * 0.22f, h * 0.50f)
+            lineTo(w * 0.46f, h * 0.74f)
+        }
+        drawPath(
+            path = arrowPath,
+            color = tint,
+            style = Stroke(width = w * 0.10f, cap = StrokeCap.Round)
+        )
+    }
+}
+
+/**
+ * Driver Avatar illustration matching the circular driver avatars in the reference design.
+ */
+@Composable
+fun DriverAvatarGraphic(
+    avatarIndex: Int = 0,
+    modifier: Modifier = Modifier.size(52.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Circle background: Light blue tint
+        drawCircle(
+            color = Color(0xFFDCEAF9),
+            radius = w * 0.50f,
+            center = Offset(w * 0.50f, h * 0.50f)
+        )
+
+        val capColor = when (avatarIndex % 3) {
+            0 -> Color(0xFF1976D2) // Blue cap
+            1 -> Color(0xFF4A2B11) // Brown hair
+            else -> Color(0xFF1E293B) // Dark cap/hair
+        }
+        val shirtColor = when (avatarIndex % 3) {
+            0 -> Color(0xFF2563EB)
+            1 -> Color(0xFF1E40AF)
+            else -> Color(0xFF3B82F6)
+        }
+        val skinColor = when (avatarIndex % 4) {
+            0 -> Color(0xFFFCD3A1)
+            1 -> Color(0xFFFBC687)
+            2 -> Color(0xFFE2A166)
+            else -> Color(0xFF8D5524)
+        }
+
+        // Shirt / Shoulders
+        val shirtPath = Path().apply {
+            moveTo(w * 0.14f, h * 0.94f)
+            cubicTo(w * 0.22f, h * 0.72f, w * 0.78f, h * 0.72f, w * 0.86f, h * 0.94f)
+            close()
+        }
+        drawPath(path = shirtPath, color = shirtColor)
+
+        // Neck
+        drawRect(
+            color = skinColor,
+            topLeft = Offset(w * 0.42f, h * 0.62f),
+            size = Size(w * 0.16f, h * 0.16f)
+        )
+
+        // Head / Face
+        drawCircle(
+            color = skinColor,
+            radius = w * 0.22f,
+            center = Offset(w * 0.50f, h * 0.48f)
+        )
+
+        // Cap / Hair (top)
+        val hairPath = Path().apply {
+            moveTo(w * 0.26f, h * 0.44f)
+            cubicTo(w * 0.24f, h * 0.22f, w * 0.76f, h * 0.22f, w * 0.74f, h * 0.44f)
+            close()
+        }
+        drawPath(path = hairPath, color = capColor)
+
+        // Cap Visor (for index 0 and 2)
+        if (avatarIndex % 2 == 0) {
+            val visor = Path().apply {
+                moveTo(w * 0.24f, h * 0.44f)
+                lineTo(w * 0.76f, h * 0.44f)
+                cubicTo(w * 0.70f, h * 0.50f, w * 0.30f, h * 0.50f, w * 0.24f, h * 0.44f)
+                close()
+            }
+            drawPath(path = visor, color = capColor)
+        }
+    }
+}
+
+@Composable
+fun CalendarIcon(
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
+    modifier: Modifier = Modifier.size(20.dp)
+) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Calendar body
+        drawRoundRect(
+            color = effectiveTint,
+            topLeft = Offset(w * 0.15f, h * 0.25f),
+            size = Size(w * 0.70f, h * 0.65f),
+            cornerRadius = CornerRadius(w * 0.08f, w * 0.08f),
+            style = Stroke(width = w * 0.08f)
+        )
+
+        // Top binder rings
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.32f, h * 0.12f),
+            end = Offset(w * 0.32f, h * 0.28f),
+            strokeWidth = w * 0.09f,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.68f, h * 0.12f),
+            end = Offset(w * 0.68f, h * 0.28f),
+            strokeWidth = w * 0.09f,
+            cap = StrokeCap.Round
+        )
+
+        // Header separator line
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.15f, h * 0.45f),
+            end = Offset(w * 0.85f, h * 0.45f),
+            strokeWidth = w * 0.06f
+        )
+
+        // Date grid dots
+        val xCoords = listOf(0.32f, 0.50f, 0.68f)
+        val yCoords = listOf(0.60f, 0.75f)
+        for (y in yCoords) {
+            for (x in xCoords) {
+                drawCircle(
+                    color = effectiveTint,
+                    radius = w * 0.035f,
+                    center = Offset(w * x, h * y)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PackageBoxIcon(
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
+    modifier: Modifier = Modifier.size(20.dp)
+) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Outer box
+        drawRoundRect(
+            color = effectiveTint,
+            topLeft = Offset(w * 0.18f, h * 0.20f),
+            size = Size(w * 0.64f, h * 0.64f),
+            cornerRadius = CornerRadius(w * 0.06f, w * 0.06f),
+            style = Stroke(width = w * 0.08f)
+        )
+
+        // Flap seam (center vertical line)
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.50f, h * 0.20f),
+            end = Offset(w * 0.50f, h * 0.84f),
+            strokeWidth = w * 0.06f
+        )
+
+        // Tape horizontal stripe
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.24f, h * 0.48f),
+            end = Offset(w * 0.76f, h * 0.48f),
+            strokeWidth = w * 0.07f
+        )
+    }
+}
+
+@Composable
+fun EditPencilIcon(
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
+    modifier: Modifier = Modifier.size(18.dp)
+) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        val pencilPath = Path().apply {
+            moveTo(w * 0.72f, h * 0.14f)
+            lineTo(w * 0.86f, h * 0.28f)
+            lineTo(w * 0.38f, h * 0.76f)
+            lineTo(w * 0.20f, h * 0.80f)
+            lineTo(w * 0.24f, h * 0.62f)
+            close()
+        }
+        drawPath(
+            path = pencilPath,
+            color = effectiveTint,
+            style = Stroke(width = w * 0.09f, cap = StrokeCap.Round)
+        )
+    }
+}
+
+@Composable
+fun EyeIcon(
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
+    modifier: Modifier = Modifier.size(18.dp)
+) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Eye shape
+        val eyePath = Path().apply {
+            moveTo(w * 0.12f, h * 0.50f)
+            cubicTo(w * 0.28f, h * 0.24f, w * 0.72f, h * 0.24f, w * 0.88f, h * 0.50f)
+            cubicTo(w * 0.72f, h * 0.76f, w * 0.28f, h * 0.76f, w * 0.12f, h * 0.50f)
+            close()
+        }
+        drawPath(
+            path = eyePath,
+            color = effectiveTint,
+            style = Stroke(width = w * 0.08f)
+        )
+
+        // Pupil
+        drawCircle(
+            color = effectiveTint,
+            radius = w * 0.14f,
+            center = Offset(w * 0.50f, h * 0.50f)
+        )
+    }
+}
+
+@Composable
+fun DocumentTextIcon(
+    tint: Color = Color.Unspecified,
+    color: Color = tint,
+    modifier: Modifier = Modifier.size(20.dp)
+) {
+    val effectiveTint = if (color != Color.Unspecified) color else if (tint != Color.Unspecified) tint else Color.White
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Paper outline
+        val pagePath = Path().apply {
+            moveTo(w * 0.22f, h * 0.15f)
+            lineTo(w * 0.62f, h * 0.15f)
+            lineTo(w * 0.78f, h * 0.31f)
+            lineTo(w * 0.78f, h * 0.85f)
+            lineTo(w * 0.22f, h * 0.85f)
+            close()
+        }
+        drawPath(
+            path = pagePath,
+            color = effectiveTint,
+            style = Stroke(width = w * 0.08f)
+        )
+
+        // Folded corner
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.62f, h * 0.15f),
+            end = Offset(w * 0.62f, h * 0.31f),
+            strokeWidth = w * 0.07f
+        )
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.62f, h * 0.31f),
+            end = Offset(w * 0.78f, h * 0.31f),
+            strokeWidth = w * 0.07f
+        )
+
+        // Text lines
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.34f, h * 0.46f),
+            end = Offset(w * 0.66f, h * 0.46f),
+            strokeWidth = w * 0.07f,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = effectiveTint,
+            start = Offset(w * 0.34f, h * 0.60f),
+            end = Offset(w * 0.66f, h * 0.60f),
+            strokeWidth = w * 0.07f,
+            cap = StrokeCap.Round
+        )
     }
 }

@@ -13,7 +13,7 @@ val localProps = Properties().apply {
         }
     }
 }
-val devBackendHost: String = localProps.getProperty("dev.backend.host") ?: "10.231.41.81"
+val devBackendHost: String = localProps.getProperty("dev.backend.host") ?: "10.227.208.81"
 val devBackendPort: Int = (localProps.getProperty("dev.backend.port") ?: "8080").toInt()
 
 android {
@@ -33,6 +33,9 @@ android {
 
         buildConfigField("String", "DEV_BACKEND_HOST", "\"$devBackendHost\"")
         buildConfigField("int", "DEV_BACKEND_PORT", "$devBackendPort")
+        val mapsApiKey = localProps.getProperty("maps.api.key") ?: ""
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
     buildTypes {
@@ -51,6 +54,9 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -65,6 +71,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.lifecycleViewModelCompose)
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.2.0")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

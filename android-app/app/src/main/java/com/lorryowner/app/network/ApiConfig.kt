@@ -58,33 +58,31 @@ object ApiConfig {
     /**
      * Computes candidate base URLs ordered by probability of success for the current environment.
      *
+     * - On an Android Studio emulator:
+     *   1. Custom override URL (if explicitly set by developer in server dialog)
+     *   2. EMULATOR_BASE_URL (http://10.0.2.2:8080, native host mapping)
+     *   3. LOOPBACK_BASE_URL (http://127.0.0.1:8080, if reverse tunnel is active)
+     *   4. DEV_LAN_BASE_URL (http://10.231.41.81:8080, fallback)
+     *
      * - On a real physical phone:
      *   1. Custom override URL (if set by developer/user)
      *   2. Last working URL (persisted from previous successful request)
      *   3. DEV_LAN_BASE_URL (laptop Wi-Fi IPv4 address on the shared network)
      *   4. LOOPBACK_BASE_URL (http://127.0.0.1:8080, valid if connected via USB with adb reverse)
      *   5. EMULATOR_BASE_URL (http://10.0.2.2:8080, fallback)
-     *
-     * - On an Android Studio emulator:
-     *   1. Custom override URL (if set)
-     *   2. Last working URL
-     *   3. EMULATOR_BASE_URL (http://10.0.2.2:8080)
-     *   4. LOOPBACK_BASE_URL (http://127.0.0.1:8080)
-     *   5. DEV_LAN_BASE_URL (http://10.231.41.81:8080)
      */
     fun getCandidateBaseUrls(sessionManager: SessionManager? = null): List<String> {
         val customUrl = sessionManager?.getCustomBaseUrl()
         val lastWorkingUrl = sessionManager?.getLastWorkingBaseUrl()
-        val currentActive = activeBaseUrl
 
         val isEmu = isEmulator()
         Log.d(TAG, "Resolving base URLs: isEmulator=$isEmu, customUrl=$customUrl, lastWorkingUrl=$lastWorkingUrl")
 
         val candidates = if (isEmu) {
+            // On emulator: customUrl first, then EMULATOR_BASE_URL (10.0.2.2:8080).
+            // Never prioritize an outdated physical-phone LAN IP over the native QEMU loopback.
             listOfNotNull(
                 customUrl,
-                lastWorkingUrl,
-                currentActive,
                 EMULATOR_BASE_URL,
                 LOOPBACK_BASE_URL,
                 DEV_LAN_BASE_URL
@@ -93,7 +91,6 @@ object ApiConfig {
             listOfNotNull(
                 customUrl,
                 lastWorkingUrl,
-                currentActive,
                 DEV_LAN_BASE_URL,
                 LOOPBACK_BASE_URL,
                 EMULATOR_BASE_URL
@@ -111,14 +108,14 @@ object ApiConfig {
      * returns the most likely default candidate for the current device.
      */
     fun getBaseUrl(sessionManager: SessionManager? = null): String {
-        activeBaseUrl?.let { return it }
-
         val customUrl = sessionManager?.getCustomBaseUrl()
         if (!customUrl.isNullOrBlank()) {
             val formatted = formatBaseUrl(customUrl)
             activeBaseUrl = formatted
             return formatted
         }
+
+        activeBaseUrl?.let { return it }
 
         val lastSaved = sessionManager?.getLastWorkingBaseUrl()
         if (!lastSaved.isNullOrBlank()) {
@@ -127,9 +124,14 @@ object ApiConfig {
             return formatted
         }
 
-        val fallback = if (isEmulator()) EMULATOR_BASE_URL else DEV_LAN_BASE_URL
-        activeBaseUrl = fallback
-        return fallback
+        if (isEmulator()) {
+            // Emulators reliably connect to host laptop via standard 10.0.2.2:8080 loopback
+            activeBaseUrl = EMULATOR_BASE_URL
+            return EMULATOR_BASE_URL
+        }
+
+        activeBaseUrl = DEV_LAN_BASE_URL
+        return DEV_LAN_BASE_URL
     }
 
     /**
