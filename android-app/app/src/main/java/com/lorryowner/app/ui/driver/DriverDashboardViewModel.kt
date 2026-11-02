@@ -20,7 +20,7 @@ import java.net.URL
 import java.time.LocalTime
 
 class DriverDashboardViewModel(
-    private val sessionManager: SessionManager? = null,
+    val sessionManager: SessionManager? = null,
     autoLoad: Boolean = (sessionManager != null)
 ) : ViewModel() {
 
@@ -167,9 +167,11 @@ class DriverDashboardViewModel(
             mutationErrorMessage = null
             mutationSuccessMessage = null
 
-            val jsonBody = if (!notes.isNullOrBlank()) {
-                JSONObject().put("notes", notes.trim()).toString()
-            } else null
+            val jsonBody = JSONObject().apply {
+                if (!notes.isNullOrBlank()) {
+                    put("notes", notes.trim())
+                }
+            }.toString()
 
             val result = withContext(Dispatchers.IO) {
                 postTripMutation(tripId, "complete", jsonBody)
@@ -261,13 +263,11 @@ class DriverDashboardViewModel(
                     readTimeout = READ_TIMEOUT_MS
                     setRequestProperty("Accept", "application/json")
                     setRequestProperty("Authorization", "Bearer $token")
-                    if (jsonBody != null) {
-                        setRequestProperty("Content-Type", "application/json")
-                        doOutput = true
-                        outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
-                    } else {
-                        setFixedLengthStreamingMode(0)
-                    }
+                    setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    doOutput = true
+                    val payloadBytes = (jsonBody ?: "{}").toByteArray(Charsets.UTF_8)
+                    setFixedLengthStreamingMode(payloadBytes.size)
+                    outputStream.use { it.write(payloadBytes) }
                 }
 
                 val responseCode = conn.responseCode
@@ -307,6 +307,7 @@ class DriverDashboardViewModel(
             DriverTripsTab.CURRENT -> allTrips.filter { it.tripStatus.equals("IN_PROGRESS", ignoreCase = true) }
             DriverTripsTab.UPCOMING -> allTrips.filter { it.tripStatus.equals("PLANNED", ignoreCase = true) }
             DriverTripsTab.COMPLETED -> allTrips.filter { it.tripStatus.equals("COMPLETED", ignoreCase = true) }
+            DriverTripsTab.CANCELLED -> allTrips.filter { it.tripStatus.equals("CANCELLED", ignoreCase = true) }
         }
     }
 

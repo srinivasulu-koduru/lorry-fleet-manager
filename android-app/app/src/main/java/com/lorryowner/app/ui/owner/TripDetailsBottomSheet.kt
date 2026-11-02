@@ -4,21 +4,45 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lorryowner.app.security.SessionManager
 import com.lorryowner.app.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TripDetailsBottomSheet(
     data: LiveTrackingLorryUiState,
+    sessionManager: SessionManager? = null,
     onDismiss: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    var documents by remember { mutableStateOf<List<com.lorryowner.app.network.DocumentUiItem>>(emptyList()) }
+    var isLoadingDocs by remember { mutableStateOf(false) }
+
+    LaunchedEffect(data.tripId) {
+        val tripId = data.tripId
+        if (tripId > 0) {
+            isLoadingDocs = true
+            val res = withContext(Dispatchers.IO) {
+                com.lorryowner.app.network.DocumentApiService.fetchDocuments(
+                    sessionManager = sessionManager,
+                    endpointPath = "/api/owner/trips/$tripId/documents"
+                )
+            }
+            isLoadingDocs = false
+            if (res.isSuccess) {
+                documents = res.getOrDefault(emptyList())
+            }
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -90,6 +114,39 @@ fun TripDetailsBottomSheet(
 
             if (data.lastGpsUpdate != null) {
                 TrackingDetailItem(label = "Last GPS Update", value = data.lastGpsUpdate)
+            }
+
+            if (data.tripId > 0) {
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "Trip Documents (${documents.size})",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = BhpNavyDark,
+                        fontSize = 15.sp
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (isLoadingDocs) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = BhpDarkForestGreen)
+                    }
+                } else if (documents.isEmpty()) {
+                    Text("No trip documents uploaded for this trip.", fontSize = 12.sp, color = BhpTextSecondary)
+                } else {
+                    for (doc in documents) {
+                        com.lorryowner.app.ui.components.DocumentCard(
+                            document = doc,
+                            sessionManager = sessionManager,
+                            canDelete = false
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

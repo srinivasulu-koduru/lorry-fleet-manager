@@ -298,6 +298,19 @@ class DriverTripControllerTest {
     }
 
     @Test
+    @DisplayName("Driver can complete an assigned IN_PROGRESS trip with empty JSON or omitted notes")
+    void testCompleteTrip_EmptyJson_Success() throws Exception {
+        mockMvc.perform(post("/api/driver/trips/" + testTrip1.getId() + "/complete")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + driver1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tripReference", is("TRIP-TEST-D1")))
+                .andExpect(jsonPath("$.tripStatus", is("COMPLETED")))
+                .andExpect(jsonPath("$.endTime", notNullValue()));
+    }
+
+    @Test
     @DisplayName("Completing a PLANNED trip without starting is rejected with 400 Bad Request")
     void testCompleteTrip_PlannedTrip_ReturnsBadRequest() throws Exception {
         String driver2Token = jwtService.generateToken(driver2);

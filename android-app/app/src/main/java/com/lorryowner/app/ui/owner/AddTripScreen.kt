@@ -604,6 +604,18 @@ fun AddTripScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 11. Trip Documents (Optional)
+            DocumentUploadStagingSection(
+                title = "Trip Documents",
+                subtitle = "E-Way Bill, Tax Invoice, Delivery Challan, LR",
+                stagedDocuments = state.stagedDocuments,
+                onAddStagedDocument = { viewModel.onAddStagedDocument(it) },
+                onRemoveStagedDocument = { viewModel.onRemoveStagedDocument(it) },
+                suggestedDocumentTypes = listOf("E-Way Bill", "Tax Invoice", "Delivery Challan", "Lorry Receipt (LR)")
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
         }
     }

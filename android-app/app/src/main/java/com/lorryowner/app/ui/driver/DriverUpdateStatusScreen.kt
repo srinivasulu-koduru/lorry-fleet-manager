@@ -33,33 +33,38 @@ fun DriverUpdateStatusScreen(
 
     val isMutating = viewModel?.isMutatingTrip ?: false
 
-    Scaffold(
-        topBar = {
-            DriverTopAppBar(
-                title = "Update Trip Status",
-                onBack = onBack
-            )
-        },
-        bottomBar = {
-            if (trip != null) {
-                val isPlanned = trip.tripStatus.equals("PLANNED", ignoreCase = true)
-                val isProgress = trip.tripStatus.equals("IN_PROGRESS", ignoreCase = true)
-                val isCompleted = trip.tripStatus.equals("COMPLETED", ignoreCase = true)
+    DriverTrackingPermissionCoordinator(
+        onPermissionsGranted = {
+            showStartConfirmDialog = true
+        }
+    ) { requestPermissions ->
+        Scaffold(
+            topBar = {
+                DriverTopAppBar(
+                    title = "Update Trip Status",
+                    onBack = onBack
+                )
+            },
+            bottomBar = {
+                if (trip != null) {
+                    val isPlanned = trip.tripStatus.equals("PLANNED", ignoreCase = true)
+                    val isProgress = trip.tripStatus.equals("IN_PROGRESS", ignoreCase = true)
+                    val isCompleted = trip.tripStatus.equals("COMPLETED", ignoreCase = true)
 
-                Surface(
-                    color = Color.White,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(modifier = Modifier.padding(16.dp)) {
-                        when {
-                            isPlanned -> {
-                                Button(
-                                    onClick = { showStartConfirmDialog = true },
-                                    enabled = !isMutating,
-                                    shape = RoundedCornerShape(12.dp),
+                    Surface(
+                        color = Color.White,
+                        shadowElevation = 8.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(modifier = Modifier.padding(16.dp)) {
+                            when {
+                                isPlanned -> {
+                                    Button(
+                                        onClick = { requestPermissions() },
+                                        enabled = !isMutating,
+                                        shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = BhpNavyDark,
+                                        containerColor = Color(0xFF16A34A),
                                         contentColor = Color.White
                                     ),
                                     modifier = Modifier
@@ -142,7 +147,7 @@ fun DriverUpdateStatusScreen(
                                     onClick = onBack,
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = BhpNavyDark,
+                                        containerColor = Color(0xFF16A34A),
                                         contentColor = Color.White
                                     ),
                                     modifier = Modifier
@@ -527,8 +532,8 @@ fun DriverUpdateStatusScreen(
                         )
                     },
                     enabled = !isMutating,
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BhpNavyDark)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A))
                 ) {
                     Text("Confirm Start", color = Color.White)
                 }
@@ -622,6 +627,7 @@ fun DriverUpdateStatusScreen(
                 }
             }
         )
+    }
     }
 }
 

@@ -323,4 +323,158 @@ class OwnerMaintenanceControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + owner1Token))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @DisplayName("Monthly Expense API: Calculates total from current month records across multiple lorries")
+    void getMonthlyExpense_currentMonthMultipleRecords_calculatesCorrectSum() throws Exception {
+        LocalDate today = LocalDate.now();
+        LocalDate startOfMonth = today.withDayOfMonth(1);
+
+        // 2 records in current month for lorry 1: 5,000 + 3,500 = 8,500
+        MaintenanceRecord r1 = new MaintenanceRecord(
+                lorry1, owner1, startOfMonth, "Oil Change", "Engine oil",
+                new BigDecimal("5000.00"), "Workshop A", 10000, null
+        );
+        MaintenanceRecord r2 = new MaintenanceRecord(
+                lorry1, owner1, startOfMonth, "Brake Check", "Brake inspection",
+                new BigDecimal("3500.00"), "Workshop B", 10500, null
+        );
+
+        // 1 record in previous month (should be excluded): 12,000
+        MaintenanceRecord rOld = new MaintenanceRecord(
+                lorry1, owner1, startOfMonth.minusMonths(2), "Gearbox Overhaul", "Transmission repair",
+                new BigDecimal("12000.00"), "Workshop C", 8000, null
+        );
+
+        maintenanceRecordRepository.save(r1);
+        maintenanceRecordRepository.save(r2);
+        maintenanceRecordRepository.save(rOld);
+
+        mockMvc.perform(get("/api/owner/maintenance/monthly-expense")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + owner1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.month").value(today.getMonthValue()))
+                .andExpect(jsonPath("$.year").value(today.getYear()))
+                .andExpect(jsonPath("$.totalAmount").value(8500.00))
+                .andExpect(jsonPath("$.recordCount").value(2));
+    }
+
+    @Test
+    @DisplayName("Monthly Expense API: Returns 0.00 when no records exist in current month")
+    void getMonthlyExpense_noRecords_returnsZero() throws Exception {
+        LocalDate today = LocalDate.now();
+
+        // Only old records exist
+        MaintenanceRecord rOld = new MaintenanceRecord(
+                lorry1, owner1, today.minusMonths(1), "Old Service", "Last month service",
+                new BigDecimal("4000.00"), "Workshop A", 5000, null
+        );
+        maintenanceRecordRepository.save(rOld);
+
+        mockMvc.perform(get("/api/owner/maintenance/monthly-expense")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + owner1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.month").value(today.getMonthValue()))
+                .andExpect(jsonPath("$.year").value(today.getYear()))
+                .andExpect(jsonPath("$.totalAmount").value(0.00))
+                .andExpect(jsonPath("$.recordCount").value(0));
+    }
+
+    @Test
+    @DisplayName("Monthly Expense API: Custom year and month query calculates correct historical sum")
+    void getMonthlyExpense_customYearMonth_calculatesCorrectly() throws Exception {
+        LocalDate oct2026 = LocalDate.of(2026, 10, 15);
+
+        // Record matching reference UI October 2026 expense: 24,500.00
+        MaintenanceRecord r1 = new MaintenanceRecord(
+                lorry1, owner1, oct2026, "Engine Overhaul", "Comprehensive engine repair",
+                new BigDecimal("24500.00"), "Bharat Motors", 55000, null
+        );
+        maintenanceRecordRepository.save(r1);
+
+        mockMvc.perform(get("/api/owner/maintenance/monthly-expense?year=2026&month=10")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + owner1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.month").value(10))
+                .andExpect(jsonPath("$.monthName").value("October"))
+                .andExpect(jsonPath("$.year").value(2026))
+                .andExpect(jsonPath("$.totalAmount").value(24500.00))
+                .andExpect(jsonPath("$.recordCount").value(1));
+    }
+
+    @Test
+    @DisplayName("Monthly Expense API: Strict owner isolation prevents seeing another owner's expenses")
+    void getMonthlyExpense_crossOwnerIsolation() throws Exception {
+        LocalDate today = LocalDate.now();
+
+        // Owner 2 records 50,000 in current month
+        MaintenanceRecord rOwner2 = new MaintenanceRecord(
+                lorry2, owner2, today, "Suspension Replacement", "Shock absorbers",
+                new BigDecimal("50000.00"), "MRF Hub", 60000, null
+        );
+        maintenanceRecordRepository.save(rOwner2);
+
+        // Owner 1 queries: should see 0.00, NOT Owner 2's 50,000
+        mockMvc.perform(get("/api/owner/maintenance/monthly-expense")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + owner1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalAmount").value(0.00))
+                .andExpect(jsonPath("$.recordCount").value(0));
+    }
+
+    @Test
+    @DisplayName("Owner Lorries API: Returns correct maintenance record counts including zero-record lorries")
+    void getOwnerLorries_returnsAccurateCounts() throws Exception {
+        LocalDate today = LocalDate.now();
+
+        // Add a second lorry for owner 1
+        Lorry lorry1b = new Lorry("AP 02 EF 9012", "Tata Signa", new BigDecimal("40.0"), OperationalStatus.AVAILABLE);
+        lorry1b.setOwner(owner1);
+        lorry1b = lorryRepository.save(lorry1b);
+
+        // Lorry 1 has 2 records
+        MaintenanceRecord r1 = new MaintenanceRecord(
+                lorry1, owner1, today.minusDays(10), "Oil Change", "Filter",
+                new BigDecimal("4000.00"), "Auto Center", 12000, null
+        );
+        MaintenanceRecord r2 = new MaintenanceRecord(
+                lorry1, owner1, today.minusDays(5), "Brake Service", "Pads",
+                new BigDecimal("3000.00"), "Auto Center", 12500, null
+        );
+        maintenanceRecordRepository.save(r1);
+        maintenanceRecordRepository.save(r2);
+
+        // Lorry 1b has 0 records
+
+        mockMvc.perform(get("/api/owner/maintenance/lorries")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + owner1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].registrationNumber").value("AP 02 AB 1234"))
+                .andExpect(jsonPath("$[0].totalRecordsCount").value(2))
+                .andExpect(jsonPath("$[0].totalCost").value(7000.00))
+                .andExpect(jsonPath("$[1].registrationNumber").value("AP 02 EF 9012"))
+                .andExpect(jsonPath("$[1].totalRecordsCount").value(0))
+                .andExpect(jsonPath("$[1].totalCost").value(0));
+    }
+
+    @Test
+    @DisplayName("Maintenance Summary includes current month's expenses and date fields")
+    void getMaintenanceSummary_includesCurrentMonthExpense() throws Exception {
+        LocalDate today = LocalDate.now();
+
+        MaintenanceRecord r1 = new MaintenanceRecord(
+                lorry1, owner1, today, "Oil Change", "Routine engine service",
+                new BigDecimal("15000.00"), "Bharat Motors", 25000, null
+        );
+        maintenanceRecordRepository.save(r1);
+
+        mockMvc.perform(get("/api/owner/maintenance/summary")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + owner1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentMonthExpense").value(15000.00))
+                .andExpect(jsonPath("$.currentMonth").isNotEmpty())
+                .andExpect(jsonPath("$.currentYear").value(today.getYear()))
+                .andExpect(jsonPath("$.totalExpenditure").value(15000.00));
+    }
 }

@@ -80,7 +80,44 @@ class MaintenanceDashboardViewModel(
                     val totalVehicles = json.optLong("totalVehicles", 0L)
                     val dueSoonCount = json.optLong("dueSoonCount", 0L)
                     val overdueCount = json.optLong("overdueCount", 0L)
+                    val upToDateCount = Math.max(0L, totalVehicles - dueSoonCount - overdueCount)
                     val totalExpenditure = json.optDouble("totalExpenditure", 0.0)
+
+                    val now = java.time.LocalDate.now()
+                    val defaultMonthName = now.month.name.lowercase().replaceFirstChar { it.uppercase() }
+                    var currentMonth = json.optString("currentMonth").takeIf { it.isNotBlank() && it != "null" } ?: defaultMonthName
+                    var currentYear = json.optInt("currentYear", now.year).let { if (it > 0) it else now.year }
+                    var currentMonthExpense = json.optDouble("currentMonthExpense", 0.0)
+
+                    // Double-layer protection: if summary response lacked currentMonthExpense, query monthly-expense endpoint
+                    if (!json.has("currentMonthExpense")) {
+                        try {
+                            val expUrl = URL("$baseUrl/api/owner/maintenance/monthly-expense")
+                            val expConn = (expUrl.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+                                requestMethod = "GET"
+                                connectTimeout = CONNECT_TIMEOUT_MS
+                                readTimeout = READ_TIMEOUT_MS
+                                setRequestProperty("Accept", "application/json")
+                                setRequestProperty("Authorization", "Bearer $token")
+                            }
+                            if (expConn.responseCode == HttpURLConnection.HTTP_OK) {
+                                val expRaw = expConn.inputStream.bufferedReader().use(BufferedReader::readText)
+                                val expJson = JSONObject(expRaw)
+                                currentMonthExpense = expJson.optDouble("totalAmount", expJson.optDouble("totalExpense", currentMonthExpense))
+                                val mName = expJson.optString("monthName")
+                                if (!mName.isNullOrBlank() && mName != "null") {
+                                    currentMonth = mName
+                                }
+                                val y = expJson.optInt("year", 0)
+                                if (y > 0) {
+                                    currentYear = y
+                                }
+                            }
+                            expConn.disconnect()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Fallback monthly expense fetch failed", e)
+                        }
+                    }
 
                     val vehiclesList = mutableListOf<VehicleMaintenanceSummaryItem>()
                     val vehiclesArray = json.optJSONArray("vehicles")
@@ -108,7 +145,11 @@ class MaintenanceDashboardViewModel(
                             totalVehicles = totalVehicles,
                             dueSoonCount = dueSoonCount,
                             overdueCount = overdueCount,
+                            upToDateCount = upToDateCount,
                             totalExpenditure = totalExpenditure,
+                            currentMonthExpense = currentMonthExpense,
+                            currentMonth = currentMonth,
+                            currentYear = currentYear,
                             vehicles = vehiclesList
                         )
                     )

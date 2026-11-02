@@ -5,17 +5,23 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.os.Bundle
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +43,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.model.*
+import com.lorryowner.app.network.OsrmRoutingService
 import com.lorryowner.app.security.SessionManager
 import com.lorryowner.app.ui.components.DashboardTruckIcon
 import com.lorryowner.app.ui.theme.*
@@ -64,7 +72,10 @@ fun LiveSatelliteTrackingScreen(
     var showTripDetailsSheet by remember { mutableStateOf(false) }
     var googleMapRef by remember { mutableStateOf<GoogleMap?>(null) }
     var currentTruckMarker by remember { mutableStateOf<Marker?>(null) }
-    var currentPolyline by remember { mutableStateOf<Polyline?>(null) }
+    var originMarker by remember { mutableStateOf<Marker?>(null) }
+    var destMarker by remember { mutableStateOf<Marker?>(null) }
+    var plannedRoutePolyline by remember { mutableStateOf<Polyline?>(null) }
+    var travelledPathPolylines by remember { mutableStateOf<List<Polyline>>(emptyList()) }
 
     // Lifecycle observer for polling
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -75,47 +86,131 @@ fun LiveSatelliteTrackingScreen(
         }
     }
 
-    // Update map marker and camera when new GPS coordinates arrive
-    LaunchedEffect(data?.latitude, data?.longitude, googleMapRef) {
+    // 1. Draw / update Road-Following Route to Destination & Terminal Pins
+    LaunchedEffect(data?.plannedRoadRoute, googleMapRef, state.isSatelliteMode) {
+        val map = googleMapRef ?: return@LaunchedEffect
+        val route = data?.plannedRoadRoute ?: return@LaunchedEffect
+        if (route.isEmpty()) return@LaunchedEffect
+
+        plannedRoutePolyline?.remove()
+        val routeColor = if (state.isSatelliteMode) {
+            android.graphics.Color.parseColor("#00E5FF") // High-contrast Neon Cyan on dark satellite
+        } else {
+            android.graphics.Color.parseColor("#2563EB") // Royal Blue on light streets
+        }
+
+        // If truck is slightly off the road (e.g. inside a compound), connect smoothly from the truck
+        val truckLat = data.latitude
+        val truckLon = data.longitude
+        val pointsToDraw = if (truckLat != null && truckLon != null && route.isNotEmpty()) {
+            val dist = OsrmRoutingService.haversineDistanceMeters(truckLat, truckLon, route[0].latitude, route[0].longitude)
+            if (dist in 5.0..250.0) {
+                listOf(LatLng(truckLat, truckLon)) + route
+            } else {
+                route
+            }
+        } else {
+            route
+        }
+
+        val polylineOptions = PolylineOptions()
+            .width(13f)
+            .color(routeColor)
+            .zIndex(2.0f)
+            .geodesic(false) // Road points already follow real highway turns
+            .addAll(pointsToDraw)
+
+        plannedRoutePolyline = map.addPolyline(polylineOptions)
+
+        // Origin Marker (Green Pin)
+        if (data.originLatitude != null && data.originLongitude != null) {
+            val originPos = LatLng(data.originLatitude, data.originLongitude)
+            val originTitle = "Origin: ${data.originLocation.ifBlank { "Pickup" }}"
+            if (originMarker == null) {
+                originMarker = map.addMarker(
+                    MarkerOptions()
+                        .position(originPos)
+                        .title(originTitle)
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
+                )
+            } else {
+                originMarker?.position = originPos
+                originMarker?.title = originTitle
+            }
+        }
+
+        // Destination Marker (Red Pin)
+        if (data.destinationLatitude != null && data.destinationLongitude != null) {
+            val destPos = LatLng(data.destinationLatitude, data.destinationLongitude)
+            val destTitle = "Destination: ${data.destinationLocation.ifBlank { "Delivery" }}"
+            if (destMarker == null) {
+                destMarker = map.addMarker(
+                    MarkerOptions()
+                        .position(destPos)
+                        .title(destTitle)
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
+                )
+            } else {
+                destMarker?.position = destPos
+                destMarker?.title = destTitle
+            }
+        }
+    }
+
+    // 2. Update Truck Marker & Actual Travelled Path using Genuine GPS Breadcrumbs
+    LaunchedEffect(data?.latitude, data?.longitude, data?.breadcrumbs, googleMapRef) {
         val map = googleMapRef ?: return@LaunchedEffect
         val lat = data?.latitude ?: return@LaunchedEffect
         val lon = data?.longitude ?: return@LaunchedEffect
 
         val truckPos = LatLng(lat, lon)
 
-        // Update or add truck marker
+        // Update or add truck marker (zIndex = 3.0f to float on top of road routes)
         if (currentTruckMarker == null) {
             val markerOptions = MarkerOptions()
                 .position(truckPos)
                 .title(data.registrationNumber.ifBlank { "Truck" })
                 .snippet("Speed: ${TrackingFormattingHelper.formatSpeed(data.currentSpeedKmh)}")
                 .icon(createTruckMarkerBitmap(context))
+                .zIndex(3.0f)
             currentTruckMarker = map.addMarker(markerOptions)
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(truckPos, 16.5f))
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(truckPos, 15.5f))
         } else {
             currentTruckMarker?.position = truckPos
             currentTruckMarker?.snippet = "Speed: ${TrackingFormattingHelper.formatSpeed(data.currentSpeedKmh)}"
             map.animateCamera(CameraUpdateFactory.newLatLng(truckPos))
         }
 
-        // Draw / update route line
-        currentPolyline?.remove()
-        val polylineOptions = PolylineOptions()
-            .width(14f)
-            .color(android.graphics.Color.parseColor("#22C55E")) // Bright Green Route Line
-            .geodesic(true)
+        // Draw / update actual travelled path using genuine GPS breadcrumbs (zIndex = 1.5f)
+        // Clean stationary jitter and segment gaps > 2000m to eliminate green zigzags and cross-field lines
+        travelledPathPolylines.forEach { it.remove() }
 
-        if (data.originLatitude != null && data.originLongitude != null) {
-            polylineOptions.add(LatLng(data.originLatitude, data.originLongitude))
+        val pathPoints = data.breadcrumbs.map {
+            OsrmRoutingService.PathPoint(
+                latitude = it.latitude,
+                longitude = it.longitude,
+                speedKmh = it.speedKmh
+            )
+        } + OsrmRoutingService.PathPoint(
+            latitude = lat,
+            longitude = lon,
+            speedKmh = data.currentSpeedKmh
+        )
+
+        val cleanSegments = OsrmRoutingService.buildCleanTravelledSegments(pathPoints)
+        val newPolylines = mutableListOf<Polyline>()
+
+        for (seg in cleanSegments) {
+            val poly = map.addPolyline(
+                PolylineOptions()
+                    .width(10f)
+                    .color(android.graphics.Color.parseColor("#16A34A")) // Emerald Green
+                    .zIndex(1.5f)
+                    .addAll(seg)
+            )
+            newPolylines.add(poly)
         }
-        for (b in data.breadcrumbs) {
-            polylineOptions.add(LatLng(b.latitude, b.longitude))
-        }
-        polylineOptions.add(truckPos)
-        if (data.destinationLatitude != null && data.destinationLongitude != null) {
-            polylineOptions.add(LatLng(data.destinationLatitude, data.destinationLongitude))
-        }
-        currentPolyline = map.addPolyline(polylineOptions)
+        travelledPathPolylines = newPolylines
     }
 
     // Toggle satellite map type
@@ -130,8 +225,8 @@ fun LiveSatelliteTrackingScreen(
     Scaffold(
         topBar = {
             TrackingTopAppBar(
-                vehicleReg = data?.registrationNumber ?: "AP 31 TC 1234",
-                gpsStatus = data?.gpsStatus ?: GpsStatus.LIVE,
+                vehicleReg = data?.registrationNumber?.ifBlank { "Live Tracking" } ?: "Live Tracking",
+                gpsStatus = data?.gpsStatus ?: GpsStatus.WAITING_FOR_LOCATION,
                 onBack = onBack
             )
         },
@@ -148,6 +243,10 @@ fun LiveSatelliteTrackingScreen(
                     googleMapRef = map
                     map.mapType = if (state.isSatelliteMode) GoogleMap.MAP_TYPE_SATELLITE else GoogleMap.MAP_TYPE_NORMAL
                     map.uiSettings.isZoomControlsEnabled = false
+                    map.uiSettings.isZoomGesturesEnabled = true
+                    map.uiSettings.isScrollGesturesEnabled = true
+                    map.uiSettings.isRotateGesturesEnabled = true
+                    map.uiSettings.isTiltGesturesEnabled = true
                     map.uiSettings.isCompassEnabled = true
                     map.uiSettings.isMapToolbarEnabled = false
 
@@ -159,19 +258,53 @@ fun LiveSatelliteTrackingScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // 2. FLOATING SPEED CARD (Top-Left)
-            SpeedCard(
-                speedKmh = data?.currentSpeedKmh,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 16.dp)
-            )
+            // 2. FLOATING SPEED CARD (Top-Left) - visible whenever telemetry is present
+            if (data != null) {
+                SpeedCard(
+                    speedKmh = data.currentSpeedKmh,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 14.dp, top = 14.dp)
+                )
+            }
 
-            // 3. FLOATING MAP CONTROLS (Top-Right)
+            // 2.1 FLOATING ROUTE DEVIATION ALERT (Top-Center)
+            if (data?.isRouteDeviated == true) {
+                Surface(
+                    color = Color(0xFFFEF2F2),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFECACA)),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 14.dp, start = 140.dp, end = 76.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("⚠️", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = "Route Deviation",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = Color(0xFFDC2626)
+                            )
+                            Text(
+                                text = "${String.format(java.util.Locale.US, "%.1f", data.deviationDistanceKm)} km off planned highway",
+                                fontSize = 10.sp,
+                                color = Color(0xFF991B1B)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 3. FLOATING MAP CONTROLS (Top-Right) - Recenter & Satellite mode (pinch to zoom used)
             MapControlsColumn(
                 isSatelliteMode = state.isSatelliteMode,
-                onZoomIn = { googleMapRef?.animateCamera(CameraUpdateFactory.zoomIn()) },
-                onZoomOut = { googleMapRef?.animateCamera(CameraUpdateFactory.zoomOut()) },
                 onRecenter = {
                     val lat = data?.latitude ?: 15.8281
                     val lon = data?.longitude ?: 78.0373
@@ -180,17 +313,125 @@ fun LiveSatelliteTrackingScreen(
                 onToggleSatellite = { viewModel.toggleMapMode() },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(end = 16.dp, top = 16.dp)
+                    .padding(end = 14.dp, top = 14.dp)
             )
 
-            // 4. BOTTOM FLOATING INFO PANEL
-            BottomTripInfoPanel(
-                data = data,
-                onTripDetailsClick = { showTripDetailsSheet = true },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-            )
+            // 4. Loading state overlay
+            if (state.isLoading && data == null) {
+                Surface(
+                    color = Color.White.copy(alpha = 0.95f),
+                    shape = RoundedCornerShape(14.dp),
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, BhpCardBorder),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        CircularProgressIndicator(color = BhpNavyDark, modifier = Modifier.size(36.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "Acquiring Live Telemetry...",
+                            fontWeight = FontWeight.Bold,
+                            color = BhpTextPrimary,
+                            fontSize = 15.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Connecting to vehicle tracking service",
+                            fontSize = 12.5.sp,
+                            color = BhpTextSecondary
+                        )
+                    }
+                }
+            }
+
+            // 5. Error state overlay
+            if (state.errorMessage != null && data == null) {
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(14.dp),
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, BhpErrorRed),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Text(
+                            text = "⚠️ Telemetry Unavailable",
+                            fontWeight = FontWeight.Bold,
+                            color = BhpErrorRed,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = state.errorMessage ?: "Failed to connect",
+                            fontSize = 13.sp,
+                            color = BhpTextSecondary,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Button(
+                            onClick = { viewModel.loadTrackingDetails() },
+                            colors = ButtonDefaults.buttonColors(containerColor = BhpNavyDark)
+                        ) {
+                            Text("Retry", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // 6. Empty state overlay (vehicle not on trip)
+            if (data == null && !state.isLoading && state.errorMessage == null) {
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(14.dp),
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, BhpCardBorder),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Text("🚚", fontSize = 36.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "No Active Trip Tracking",
+                            fontWeight = FontWeight.Bold,
+                            color = BhpTextPrimary,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "This vehicle does not currently have an active trip with live GPS telemetry.",
+                            fontSize = 13.sp,
+                            color = BhpTextSecondary,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            // 7. BOTTOM MOBILE PORTRAIT INFO PANEL
+            if (data != null) {
+                BottomTripInfoPanel(
+                    data = data,
+                    onTripDetailsClick = { showTripDetailsSheet = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                )
+            }
         }
     }
 
@@ -198,6 +439,7 @@ fun LiveSatelliteTrackingScreen(
     if (showTripDetailsSheet && data != null) {
         TripDetailsBottomSheet(
             data = data,
+            sessionManager = sessionManager,
             onDismiss = { showTripDetailsSheet = false }
         )
     }
@@ -220,7 +462,7 @@ fun TrackingTopAppBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
@@ -234,49 +476,38 @@ fun TrackingTopAppBar(
             Spacer(modifier = Modifier.width(4.dp))
 
             // BHP Brand Icon
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFEA580C)),
-                contentAlignment = Alignment.Center
+            Surface(
+                color = Color(0xFFEA580C),
+                shape = CircleShape,
+                modifier = Modifier.size(32.dp)
             ) {
-                DashboardTruckIcon(tint = Color.White, modifier = Modifier.size(16.dp))
+                Box(contentAlignment = Alignment.Center) {
+                    DashboardTruckIcon(tint = Color.White, modifier = Modifier.size(18.dp))
+                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            Text(
-                text = "BHP Logistics",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 17.sp
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "BHP Logistics • Live Tracking",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = vehicleReg,
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
-            Text(
-                text = " | ",
-                color = Color(0xFF64748B),
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Normal
-            )
-
-            Text(
-                text = "Live Tracking",
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                modifier = Modifier.weight(1f)
-            )
-
-            // Vehicle Registration
-            Text(
-                text = "Vehicle: $vehicleReg",
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
             // Live Pill Badge
             GpsStatusBadge(status = gpsStatus)
@@ -295,12 +526,12 @@ fun SpeedCard(
     Surface(
         color = Color.White,
         shape = RoundedCornerShape(12.dp),
-        shadowElevation = 4.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = 6.dp,
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         modifier = modifier
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
         ) {
             Text(
                 text = "CURRENT SPEED",
@@ -318,8 +549,8 @@ fun SpeedCard(
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.ExtraBold,
                         color = BhpTextPrimary,
-                        fontSize = 28.sp,
-                        lineHeight = 28.sp
+                        fontSize = 26.sp,
+                        lineHeight = 26.sp
                     )
                 )
                 Spacer(modifier = Modifier.width(4.dp))
@@ -327,10 +558,10 @@ fun SpeedCard(
                     text = "km/h",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = BhpTextPrimary,
-                        fontSize = 14.sp
+                        color = BhpTextSecondary,
+                        fontSize = 13.sp
                     ),
-                    modifier = Modifier.padding(bottom = 3.dp)
+                    modifier = Modifier.padding(bottom = 2.dp)
                 )
             }
         }
@@ -338,13 +569,12 @@ fun SpeedCard(
 }
 
 /**
- * Top-right floating map controls (Zoom in, Zoom out, Recenter, Satellite mode).
+ * Top-right floating map controls (Recenter, Satellite toggle).
+ * Pinch-to-zoom is supported natively on the map surface.
  */
 @Composable
 fun MapControlsColumn(
     isSatelliteMode: Boolean,
-    onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit,
     onRecenter: () -> Unit,
     onToggleSatellite: () -> Unit,
     modifier: Modifier = Modifier
@@ -354,57 +584,46 @@ fun MapControlsColumn(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
     ) {
-        // Zoom Controls Card
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(8.dp),
-            shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
-        ) {
-            Column {
-                IconButton(onClick = onZoomIn, modifier = Modifier.size(38.dp)) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Zoom In", tint = BhpNavyDark)
-                }
-                HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
-                IconButton(onClick = onZoomOut, modifier = Modifier.size(38.dp)) {
-                    Icon(imageVector = Icons.Default.Remove, contentDescription = "Zoom Out", tint = BhpNavyDark)
-                }
-            }
-        }
-
         // Recenter Button
         Surface(
             color = Color.White,
-            shape = RoundedCornerShape(8.dp),
-            shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+            shape = RoundedCornerShape(10.dp),
+            shadowElevation = 5.dp,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            modifier = Modifier.size(42.dp)
         ) {
-            IconButton(onClick = onRecenter, modifier = Modifier.size(38.dp)) {
-                Icon(imageVector = Icons.Default.MyLocation, contentDescription = "Re-center", tint = BhpNavyDark)
+            IconButton(onClick = onRecenter, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    imageVector = Icons.Default.MyLocation,
+                    contentDescription = "Re-center",
+                    tint = BhpNavyDark,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
 
         // Satellite Mode Toggle Button
         Surface(
             color = if (isSatelliteMode) BhpNavyDark else Color.White,
-            shape = RoundedCornerShape(8.dp),
-            shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1)),
+            shape = RoundedCornerShape(10.dp),
+            shadowElevation = 5.dp,
+            border = BorderStroke(1.dp, if (isSatelliteMode) BhpNavyDark else Color(0xFFCBD5E1)),
             modifier = Modifier.clickable { onToggleSatellite() }
         ) {
             Text(
-                text = "SATELLITE",
+                text = if (isSatelliteMode) "SATELLITE" else "NORMAL",
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
                 color = if (isSatelliteMode) Color.White else BhpNavyDark,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
             )
         }
     }
 }
 
 /**
- * Bottom responsive trip information bar matching reference screenshot.
+ * Bottom expandable and swipeable portrait trip information panel.
+ * Can be pulled down (kindaki) or pulled up (paiki) seamlessly.
  */
 @Composable
 fun BottomTripInfoPanel(
@@ -412,136 +631,291 @@ fun BottomTripInfoPanel(
     onTripDetailsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (data == null) return
+
+    var isExpanded by remember { mutableStateOf(false) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+
     Surface(
         color = Color.White,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        shadowElevation = 12.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+        shadowElevation = 16.dp,
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragEnd = {
+                            if (dragOffsetY < -25f) {
+                                isExpanded = true
+                            } else if (dragOffsetY > 25f) {
+                                isExpanded = false
+                            }
+                            dragOffsetY = 0f
+                        },
+                        onVerticalDrag = { _, dragAmount ->
+                            dragOffsetY += dragAmount
+                        }
+                    )
+                }
         ) {
-            // Drag handle indicator
+            // Drag Handle Bar (Top Center) - Clickable to toggle
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .width(36.dp)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Color(0xFFCBD5E1))
-            )
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(44.dp)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color(0xFFCBD5E1))
+                )
+            }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Main Info Row: Driver | Current Location | Distance Travelled | Distance Remaining | ETA | CTA
+            // Always-Visible Peek Header (Tappable to Expand / Collapse)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Driver
-                Column(modifier = Modifier.weight(1.1f)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Driver",
-                        fontSize = 11.sp,
-                        color = BhpTextSecondary,
-                        fontWeight = FontWeight.Medium
+                        text = data.registrationNumber.ifBlank { "Vehicle" },
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = BhpTextPrimary,
+                            fontSize = 17.sp
+                        )
                     )
                     Text(
-                        text = data?.driverName?.ifBlank { "Ramesh Kumar" } ?: "Ramesh Kumar",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BhpTextPrimary,
+                        text = if (isExpanded) {
+                            "Driver: ${data.driverName.ifBlank { "Unassigned" }}"
+                        } else {
+                            "Driver: ${data.driverName.ifBlank { "Unassigned" }}  •  Swipe up for details"
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = if (isExpanded) BhpTextSecondary else BhpNavyDark,
+                            fontWeight = if (isExpanded) FontWeight.Normal else FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                // Current Location
-                Column(modifier = Modifier.weight(1.4f)) {
-                    Text(
-                        text = "Current Location",
-                        fontSize = 11.sp,
-                        color = BhpTextSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = data?.currentLocationDescription ?: "Near Kurnool (NH 44)",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BhpTextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    GpsStatusBadge(status = data.gpsStatus)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = Color(0xFFF1F5F9),
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clickable { isExpanded = !isExpanded }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = if (isExpanded) "▼" else "▲",
+                                color = BhpNavyDark,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
+            }
 
-                // Distance Travelled
-                Column(modifier = Modifier.weight(1.1f)) {
-                    Text(
-                        text = "Distance Travelled",
-                        fontSize = 11.sp,
-                        color = BhpTextSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = TrackingFormattingHelper.formatDistance(data?.distanceTravelledKm ?: 145.0),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BhpTextPrimary
-                    )
-                }
-
-                // Distance Remaining
-                Column(modifier = Modifier.weight(1.1f)) {
-                    Text(
-                        text = "Distance Remaining",
-                        fontSize = 11.sp,
-                        color = BhpTextSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = TrackingFormattingHelper.formatDistance(data?.remainingDistanceKm ?: 285.0),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BhpTextPrimary
-                    )
-                }
-
-                // ETA
-                Column(modifier = Modifier.weight(0.9f)) {
-                    Text(
-                        text = "ETA",
-                        fontSize = 11.sp,
-                        color = BhpTextSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = data?.estimatedDrivingTime?.ifBlank { "4h 55m" } ?: "4h 55m",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BhpTextPrimary
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                // Trip Details Button
-                Button(
-                    onClick = onTripDetailsClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = BhpNavyDark),
-                    shape = RoundedCornerShape(20.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+            // Expandable Content (Sliding up/down)
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(animationSpec = tween(250)) + fadeIn(animationSpec = tween(250)),
+                exit = shrinkVertically(animationSpec = tween(250)) + fadeOut(animationSpec = tween(200))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
                 ) {
-                    Text(
-                        text = "Trip Details",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    // Visible Stale Location Banner
+                    if (data.gpsStatus == GpsStatus.STALE || data.gpsStatus == GpsStatus.WAITING_FOR_LOCATION) {
+                        Surface(
+                            color = if (data.gpsStatus == GpsStatus.STALE) Color(0xFFFEF3C7) else Color(0xFFF1F5F9),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, if (data.gpsStatus == GpsStatus.STALE) Color(0xFFFDE68A) else Color(0xFFE2E8F0)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (data.gpsStatus == GpsStatus.STALE) "⚠️ Stale GPS" else "⏳ Waiting for Fix",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.5.sp,
+                                    color = if (data.gpsStatus == GpsStatus.STALE) Color(0xFFB45309) else Color(0xFF475569)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (!data.lastGpsUpdate.isNullOrBlank()) "Last seen: ${data.lastGpsUpdate}" else "Awaiting telemetry from driver app",
+                                    fontSize = 11.sp,
+                                    color = if (data.gpsStatus == GpsStatus.STALE) Color(0xFF92400E) else Color(0xFF64748B)
+                                )
+                            }
+                        }
+                    }
+
+                    // Visible Route Deviation Alert
+                    if (data.isRouteDeviated) {
+                        Surface(
+                            color = Color(0xFFFEF2F2),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFFECACA)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "⚠️ Route Deviation",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.5.sp,
+                                    color = Color(0xFFDC2626)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Vehicle is ~${String.format(java.util.Locale.US, "%.1f", data.deviationDistanceKm)} km away from designated road path",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF991B1B)
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0xFFF1F5F9), modifier = Modifier.padding(vertical = 6.dp))
+
+                    // Row 2: Route Origin -> Destination
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Text("📍", fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${data.originLocation.ifBlank { "Origin" }} → ${data.destinationLocation.ifBlank { "Destination" }}",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = BhpTextPrimary,
+                                fontSize = 13.5.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Row 3: 3 Compact Metric Chips (Location, Distance, ETA)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Current Location
+                        Surface(
+                            color = Color(0xFFF8FAFC),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            modifier = Modifier.weight(1.3f)
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                                Text("Current Location", fontSize = 10.5.sp, color = BhpTextSecondary)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = data.currentLocationDescription.ifBlank { "Pending location" },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BhpTextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        // Remaining Distance
+                        Surface(
+                            color = Color(0xFFF8FAFC),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                                Text("Remaining", fontSize = 10.5.sp, color = BhpTextSecondary)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (data.remainingDistanceKm > 0) TrackingFormattingHelper.formatDistance(data.remainingDistanceKm) else "--",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BhpTextPrimary,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        // ETA
+                        Surface(
+                            color = Color(0xFFF8FAFC),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            modifier = Modifier.weight(0.9f)
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                                Text("ETA", fontSize = 10.5.sp, color = BhpTextSecondary)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = data.estimatedDrivingTime.ifBlank { "--" },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BhpTextPrimary,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Row 4: Touch-friendly full-width "View Full Trip Details" button
+                    Button(
+                        onClick = onTripDetailsClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = BhpNavyDark),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                    ) {
+                        Text(
+                            text = "View Full Trip Details",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.lorryowner.app.service
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -8,6 +9,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.Location
 import android.location.LocationListener
@@ -16,13 +18,18 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import com.lorryowner.app.MainActivity
 import com.lorryowner.app.network.ApiConfig
 import com.lorryowner.app.security.SessionManager
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
@@ -31,7 +38,13 @@ import java.time.Instant
 
 /**
  * Foreground service providing battery-conscious, high-reliability live GPS tracking
- * from the authenticated driver's phone during an active trip.
+ * from the authenticated driver's phone during an active IN_PROGRESS trip.
+ *
+ * Continues tracking when the driver switches apps or the phone screen is locked.
+ * Features:
+ * - Scoped Partial WakeLock with 15s timeout to ensure HTTP uploads complete during screen lock.
+ * - Persistent bounded offline queue to buffer GPS fixes during cellular dead zones.
+ * - Automatic termination if the backend reports the trip was cancelled, completed, or unassigned.
  */
 class DriverTripTrackingService : Service(), LocationListener {
 
@@ -39,11 +52,24 @@ class DriverTripTrackingService : Service(), LocationListener {
         private const val TAG = "TripTrackingService"
         const val ACTION_START_TRACKING = "com.lorryowner.app.action.START_TRACKING"
         const val ACTION_STOP_TRACKING = "com.lorryowner.app.action.STOP_TRACKING"
+        const val ACTION_RESTART_TRACKING = "com.lorryowner.app.action.RESTART_TRACKING"
         const val EXTRA_TRIP_ID = "extra_trip_id"
         const val EXTRA_TRIP_REF = "extra_trip_ref"
 
         private const val NOTIFICATION_CHANNEL_ID = "bhp_trip_tracking_channel"
         private const val NOTIFICATION_ID = 2001
+
+        private val _isTrackingActive = MutableStateFlow(false)
+        val isTrackingActive: StateFlow<Boolean> = _isTrackingActive.asStateFlow()
+
+        private val _currentTrackingTripId = MutableStateFlow<Long?>(null)
+        val currentTrackingTripId: StateFlow<Long?> = _currentTrackingTripId.asStateFlow()
+
+        private val _latestLocation = MutableStateFlow<Location?>(null)
+        val latestLocation: StateFlow<Location?> = _latestLocation.asStateFlow()
+
+        private val _recentLocations = MutableStateFlow<List<Location>>(emptyList())
+        val recentLocations: StateFlow<List<Location>> = _recentLocations.asStateFlow()
 
         fun startTracking(context: Context, tripId: Long, tripReference: String) {
             val intent = Intent(context, DriverTripTrackingService::class.java).apply {
@@ -64,25 +90,49 @@ class DriverTripTrackingService : Service(), LocationListener {
             }
             context.startService(intent)
         }
+
+        fun restartTracking(context: Context, tripId: Long, tripReference: String) {
+            val intent = Intent(context, DriverTripTrackingService::class.java).apply {
+                action = ACTION_RESTART_TRACKING
+                putExtra(EXTRA_TRIP_ID, tripId)
+                putExtra(EXTRA_TRIP_REF, tripReference)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var sessionManager: SessionManager? = null
+    private var offlineQueue: TripLocationOfflineQueue? = null
     private var currentTripId: Long? = null
     private var currentTripRef: String? = null
 
     private var locationManager: LocationManager? = null
     private var fusedLocationClient: FusedLocationProviderClient? = null
     private var fusedLocationCallback: LocationCallback? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
-    private var lastSubmittedTime: Long = 0
-    private var lastSubmittedLat: Double = 0.0
-    private var lastSubmittedLon: Double = 0.0
+    private val gpsFilter = StationaryGpsFilter()
 
     override fun onCreate() {
         super.onCreate()
         sessionManager = SessionManager(applicationContext)
+        offlineQueue = TripLocationOfflineQueue(applicationContext)
         locationManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BhpLogistics:DriverTripTrackingWakeLock")?.apply {
+                setReferenceCounted(false)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "WakeLock initialization failed: ${e.message}")
+        }
+
         try {
             fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         } catch (e: Exception) {
@@ -107,11 +157,48 @@ class DriverTripTrackingService : Service(), LocationListener {
             return START_NOT_STICKY
         }
 
+        // Verify location permissions before starting foreground service (Android 14 requirement)
+        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) {
+            Log.e(TAG, "Cannot start foreground service: Location permission is not granted.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        val isRestart = action == ACTION_RESTART_TRACKING
+        if (isRestart) {
+            Log.i(TAG, "Driver requested manual GPS tracking restart for trip #$tripId ($tripRef)")
+        }
+
+        // Clean up prior listeners before attaching new ones
+        try {
+            fusedLocationCallback?.let { fusedLocationClient?.removeLocationUpdates(it) }
+            locationManager?.removeUpdates(this)
+        } catch (e: Exception) {
+            Log.d(TAG, "Cleanup prior listeners on (re)start: ${e.message}")
+        }
+
         currentTripId = tripId
         currentTripRef = tripRef
+        gpsFilter.reset()
+        _isTrackingActive.value = true
+        _currentTrackingTripId.value = tripId
 
         startForegroundNotification(tripRef)
         startLocationUpdates()
+
+        // Attempt immediate lastLocation query for fast coordinator refresh
+        try {
+            fusedLocationClient?.lastLocation?.addOnSuccessListener { loc ->
+                if (loc != null) {
+                    Log.d(TAG, "Fast GPS refresh fix acquired upon (re)start: ${loc.latitude}, ${loc.longitude}")
+                    handleNewLocation(loc)
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Immediate location check error: ${e.message}")
+        }
 
         return START_STICKY
     }
@@ -162,7 +249,7 @@ class DriverTripTrackingService : Service(), LocationListener {
 
     @SuppressLint("MissingPermission")
     private fun startLocationUpdates() {
-        // 1. Try FusedLocationProviderClient first
+        // 1. Try FusedLocationProviderClient first (highest accuracy & battery balance)
         try {
             val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 12_000L)
                 .setMinUpdateIntervalMillis(8_000L)
@@ -219,58 +306,115 @@ class DriverTripTrackingService : Service(), LocationListener {
 
     override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
     override fun onProviderEnabled(provider: String) {
-        Log.d(TAG, "Provider enabled: $provider")
+        Log.d(TAG, "Location provider enabled: $provider")
     }
     override fun onProviderDisabled(provider: String) {
-        Log.w(TAG, "Provider disabled: $provider")
+        Log.w(TAG, "Location provider disabled: $provider")
     }
 
     private fun handleNewLocation(location: Location) {
-        val now = System.currentTimeMillis()
-        // Throttle updates: minimum 5 seconds between consecutive HTTP uploads unless moved > 25 meters
-        val timeDiff = now - lastSubmittedTime
-        val distMoved = FloatArray(1)
-        Location.distanceBetween(lastSubmittedLat, lastSubmittedLon, location.latitude, location.longitude, distMoved)
+        val filterResult = gpsFilter.filter(location)
+        when (filterResult) {
+            is GpsFilterResult.DiscardUnreliable -> {
+                Log.d(TAG, "Discarded GPS fix: ${filterResult.reason} (accuracy=${filterResult.accuracyMeters}m)")
+                return
+            }
+            is GpsFilterResult.SuppressStationaryJitter -> {
+                // Keep UI lorry marker anchored to the stable stop coordinate with speed clamped to 0
+                val stableLocation = Location(location).apply {
+                    latitude = filterResult.anchoredLat
+                    longitude = filterResult.anchoredLon
+                    speed = 0.0f
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        speedAccuracyMetersPerSecond = 0.0f
+                    }
+                }
+                _latestLocation.value = stableLocation
 
-        if (timeDiff < 5_000L && distMoved[0] < 25.0f) {
-            return
-        }
+                if (!filterResult.shouldEmitHeartbeat) {
+                    Log.d(TAG, "Suppressed stationary GPS jitter: dist=${filterResult.displacementFromAnchor.toInt()}m, speed=${filterResult.speedKmh} km/h")
+                    return
+                }
 
-        lastSubmittedTime = now
-        lastSubmittedLat = location.latitude
-        lastSubmittedLon = location.longitude
+                // Heartbeat interval reached: transmit stable anchor coordinates to keep server updated without breadcrumb zigzags
+                Log.d(TAG, "Emitting stationary heartbeat for Trip #$currentTripId at anchor (${filterResult.anchoredLat}, ${filterResult.anchoredLon})")
+                transmitLocation(stableLocation, speedKmh = 0.0)
+            }
+            is GpsFilterResult.AcceptGenuineMovement -> {
+                _latestLocation.value = location
+                val currentHistory = _recentLocations.value
+                _recentLocations.value = (currentHistory + location).takeLast(40)
 
-        val tripId = currentTripId ?: return
-        val speedKmh = if (location.hasSpeed()) (location.speed * 3.6).coerceAtLeast(0.0) else null
-        val heading = if (location.hasBearing()) location.bearing.toDouble() else null
-        val accuracy = if (location.hasAccuracy()) location.accuracy.toDouble() else null
-
-        serviceScope.launch {
-            uploadLocationToBackend(tripId, location.latitude, location.longitude, speedKmh, heading, accuracy)
+                Log.d(TAG, "Accepted genuine movement: dist=${filterResult.displacement.toInt()}m, speed=${filterResult.speedKmh} km/h, acc=${location.accuracy}m")
+                transmitLocation(location, speedKmh = filterResult.speedKmh.toDouble())
+            }
         }
     }
 
-    private suspend fun uploadLocationToBackend(
-        tripId: Long,
-        lat: Double,
-        lon: Double,
-        speedKmh: Double?,
-        heading: Double?,
-        accuracy: Double?
-    ) {
-        val token = sessionManager?.getAccessToken() ?: return
-        val candidateUrls = ApiConfig.getCandidateBaseUrls(sessionManager)
+    private fun transmitLocation(location: Location, speedKmh: Double?) {
+        val tripId = currentTripId ?: return
+        val heading = if (location.hasBearing()) location.bearing.toDouble() else null
+        val accuracy = if (location.hasAccuracy()) location.accuracy.toDouble() else null
+        val recordedAt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Instant.now().toString() else ""
 
-        val payload = JSONObject().apply {
-            put("latitude", lat)
-            put("longitude", lon)
-            if (speedKmh != null) put("speedKmh", speedKmh)
-            if (heading != null) put("heading", heading)
-            if (accuracy != null) put("accuracyMeters", accuracy)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                put("recordedAt", Instant.now().toString())
+        // Acquire WakeLock with 15-second safety timeout so CPU doesn't sleep mid-upload
+        try {
+            wakeLock?.acquire(15_000L)
+        } catch (e: Exception) {
+            Log.w(TAG, "WakeLock acquire failed: ${e.message}")
+        }
+
+        serviceScope.launch {
+            val queuedPoint = TripLocationOfflineQueue.QueuedLocation(
+                tripId = tripId,
+                latitude = location.latitude,
+                longitude = location.longitude,
+                speedKmh = speedKmh,
+                heading = heading,
+                accuracyMeters = accuracy,
+                recordedAt = recordedAt
+            )
+
+            val uploadResult = uploadSingleLocation(tripId, queuedPoint.toHttpPayload())
+            when (uploadResult) {
+                UploadResult.SUCCESS -> {
+                    // Flush any pending points queued during dead zones
+                    flushOfflineQueue(tripId)
+                }
+                UploadResult.NETWORK_ERROR -> {
+                    // Cellular dead zone: buffer in offline queue
+                    offlineQueue?.enqueue(queuedPoint)
+                }
+                UploadResult.TRIP_INACTIVE -> {
+                    // Trip was completed or cancelled remotely by owner
+                    Log.i(TAG, "Trip #$tripId is no longer active. Automatically stopping tracking service.")
+                    offlineQueue?.clear()
+                    stopTrackingInternal()
+                }
+                UploadResult.UNAUTHORIZED -> {
+                    Log.w(TAG, "Driver session unauthorized or unassigned. Stopping tracking service.")
+                    offlineQueue?.clear()
+                    stopTrackingInternal()
+                }
             }
-        }.toString()
+        }
+    }
+
+    private enum class UploadResult {
+        SUCCESS,
+        NETWORK_ERROR,
+        TRIP_INACTIVE,
+        UNAUTHORIZED
+    }
+
+    private fun uploadSingleLocation(tripId: Long, payload: String): UploadResult {
+        val token = sessionManager?.getAccessToken()
+        if (token.isNullOrBlank()) {
+            return UploadResult.UNAUTHORIZED
+        }
+
+        val candidateUrls = ApiConfig.getCandidateBaseUrls(sessionManager)
+        var networkFailed = false
 
         for (baseUrl in candidateUrls) {
             try {
@@ -290,28 +434,90 @@ class DriverTripTrackingService : Service(), LocationListener {
                 }
 
                 val code = conn.responseCode
-                if (code in 200..299) {
-                    Log.d(TAG, "Live GPS location uploaded successfully to $fullUrl (lat=$lat, lon=$lon, speed=$speedKmh)")
-                    conn.disconnect()
-                    return
-                } else {
-                    Log.w(TAG, "Backend returned HTTP $code for location update")
-                    conn.disconnect()
+                conn.disconnect()
+
+                when (code) {
+                    in 200..299 -> {
+                        ApiConfig.onUrlSuccess(sessionManager, baseUrl)
+                        return UploadResult.SUCCESS
+                    }
+                    400, 404 -> {
+                        // Bad Request: "Cannot submit location for a cancelled/completed trip" or Not Found
+                        return UploadResult.TRIP_INACTIVE
+                    }
+                    403 -> {
+                        // Forbidden: Driver is not assigned to this trip
+                        return UploadResult.UNAUTHORIZED
+                    }
+                    401 -> {
+                        return UploadResult.UNAUTHORIZED
+                    }
+                    else -> {
+                        Log.w(TAG, "Server returned HTTP $code from $fullUrl")
+                    }
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "Network attempt to $baseUrl failed: ${e.message}")
+                networkFailed = true
             }
+        }
+
+        return if (networkFailed) UploadResult.NETWORK_ERROR else UploadResult.NETWORK_ERROR
+    }
+
+    private suspend fun flushOfflineQueue(tripId: Long) {
+        val queue = offlineQueue ?: return
+        val pendingCount = queue.size()
+        if (pendingCount == 0) return
+
+        Log.d(TAG, "Flushing $pendingCount offline queued fixes for trip #$tripId...")
+        val batch = queue.peekOldest(10)
+        var uploadedCount = 0
+
+        for (point in batch) {
+            val result = uploadSingleLocation(tripId, point.toHttpPayload())
+            if (result == UploadResult.SUCCESS) {
+                uploadedCount++
+            } else if (result == UploadResult.TRIP_INACTIVE || result == UploadResult.UNAUTHORIZED) {
+                queue.clear()
+                stopTrackingInternal()
+                return
+            } else {
+                // Network failed mid-flush; stop flush and retry later
+                break
+            }
+        }
+
+        if (uploadedCount > 0) {
+            queue.removeOldest(uploadedCount)
         }
     }
 
     private fun stopTrackingInternal() {
+        gpsFilter.reset()
+        _isTrackingActive.value = false
+        _currentTrackingTripId.value = null
+        _latestLocation.value = null
+        _recentLocations.value = emptyList()
+
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+                Log.d(TAG, "Released WakeLock.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing WakeLock: ${e.message}")
+        }
+
         try {
             fusedLocationCallback?.let { fusedLocationClient?.removeLocationUpdates(it) }
             locationManager?.removeUpdates(this)
         } catch (e: Exception) {
             Log.e(TAG, "Error removing location updates: ${e.message}")
         }
+
         serviceScope.cancel()
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {
@@ -319,6 +525,7 @@ class DriverTripTrackingService : Service(), LocationListener {
             stopForeground(true)
         }
         stopSelf()
+        Log.i(TAG, "DriverTripTrackingService stopped successfully.")
     }
 
     override fun onDestroy() {

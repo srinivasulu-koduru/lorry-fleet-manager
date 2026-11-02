@@ -103,6 +103,8 @@ public interface TripRepository extends JpaRepository<Trip, Long>, JpaSpecificat
 
     boolean existsByTripReference(String tripReference);
 
+    boolean existsByDriverAndLorry(User driver, com.lorryowner.backend.entity.Lorry lorry);
+
     boolean existsByLorryAndTripStatusIn(com.lorryowner.backend.entity.Lorry lorry, List<TripStatus> statuses);
 
     boolean existsByDriverAndTripStatusIn(User driver, List<TripStatus> statuses);

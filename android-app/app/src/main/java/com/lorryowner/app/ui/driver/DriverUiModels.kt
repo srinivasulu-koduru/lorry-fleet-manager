@@ -14,9 +14,10 @@ enum class DriverNavDestination(val label: String) {
  * Filter tabs for the My Trips screen.
  */
 enum class DriverTripsTab(val label: String) {
-    CURRENT("Current"),
+    CURRENT("Active"),
     UPCOMING("Upcoming"),
-    COMPLETED("Completed")
+    COMPLETED("Completed"),
+    CANCELLED("Cancelled")
 }
 
 /**

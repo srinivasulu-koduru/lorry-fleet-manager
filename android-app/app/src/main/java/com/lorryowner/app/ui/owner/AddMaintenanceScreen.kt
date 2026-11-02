@@ -235,11 +235,13 @@ fun AddMaintenanceScreen(
                 )
                 ExposedDropdownMenu(
                     expanded = lorryMenuExpanded,
-                    onDismissRequest = { lorryMenuExpanded = false }
+                    onDismissRequest = { lorryMenuExpanded = false },
+                    modifier = Modifier.background(Color.White)
                 ) {
                     state.lorries.forEach { lorry ->
                         DropdownMenuItem(
-                            text = { Text("${lorry.registrationNumber} (${lorry.makeModel})") },
+                            text = { Text("${lorry.registrationNumber} (${lorry.makeModel})", color = BhpTextPrimary) },
+                            colors = MenuDefaults.itemColors(textColor = BhpTextPrimary),
                             onClick = {
                                 viewModel.onLorrySelected(lorry)
                                 lorryMenuExpanded = false
@@ -271,11 +273,13 @@ fun AddMaintenanceScreen(
                 )
                 ExposedDropdownMenu(
                     expanded = serviceTypeExpanded,
-                    onDismissRequest = { serviceTypeExpanded = false }
+                    onDismissRequest = { serviceTypeExpanded = false },
+                    modifier = Modifier.background(Color.White)
                 ) {
                     AddMaintenanceViewModel.MAINTENANCE_TYPES.forEach { type ->
                         DropdownMenuItem(
-                            text = { Text(type) },
+                            text = { Text(type, color = BhpTextPrimary) },
+                            colors = MenuDefaults.itemColors(textColor = BhpTextPrimary),
                             onClick = {
                                 viewModel.onServiceTypeChanged(type)
                                 serviceTypeExpanded = false

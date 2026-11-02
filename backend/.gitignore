@@ -39,3 +39,7 @@ application-secret.yml
 
 ### Logs ###
 *.log
+
+### Uploaded User Documents & Media ###
+uploads/
+

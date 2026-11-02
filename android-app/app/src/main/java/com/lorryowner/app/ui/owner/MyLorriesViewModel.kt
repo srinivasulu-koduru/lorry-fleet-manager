@@ -21,6 +21,8 @@ import java.net.URLEncoder
 enum class LorryFilter {
     ALL,
     RUNNING,
+    LOADING,
+    AVAILABLE,
     NOT_RUNNING
 }
 
@@ -30,6 +32,12 @@ data class FleetSummaryUiState(
     val notRunningLorries: Long = 0,
     val runningPercentage: Double = 0.0,
     val notRunningPercentage: Double = 0.0,
+    val loadingLorries: Long = 0,
+    val loadingPercentage: Double = 0.0,
+    val availableLorries: Long = 0,
+    val availablePercentage: Double = 0.0,
+    val notReadyLorries: Long = 0,
+    val notReadyPercentage: Double = 0.0,
     val totalTrips: Long = 0,
     val totalDistanceKm: Double = 0.0,
     val totalMaintenanceCost: Double = 0.0
@@ -140,8 +148,10 @@ class MyLorriesViewModel(
         val filtered = uiState.lorries.filter { lorry ->
             val matchesFilter = when (filter) {
                 LorryFilter.ALL -> true
-                LorryFilter.RUNNING -> lorry.running
-                LorryFilter.NOT_RUNNING -> !lorry.running
+                LorryFilter.RUNNING -> lorry.operationalStatus == "ON_TRIP" || lorry.running
+                LorryFilter.LOADING -> lorry.operationalStatus == "LOADING"
+                LorryFilter.AVAILABLE -> lorry.operationalStatus == "AVAILABLE"
+                LorryFilter.NOT_RUNNING -> !lorry.running && lorry.operationalStatus != "ON_TRIP"
             }
 
             val matchesSearch = if (query.isEmpty()) {
@@ -185,6 +195,12 @@ class MyLorriesViewModel(
                     notRunningLorries = json.optLong("notRunningLorries", 0L),
                     runningPercentage = json.optDouble("runningPercentage", 0.0),
                     notRunningPercentage = json.optDouble("notRunningPercentage", 0.0),
+                    loadingLorries = json.optLong("loadingLorries", 0L),
+                    loadingPercentage = json.optDouble("loadingPercentage", 0.0),
+                    availableLorries = json.optLong("availableLorries", json.optLong("notRunningLorries", 0L)),
+                    availablePercentage = json.optDouble("availablePercentage", json.optDouble("notRunningPercentage", 0.0)),
+                    notReadyLorries = json.optLong("notReadyLorries", 0L),
+                    notReadyPercentage = json.optDouble("notReadyPercentage", 0.0),
                     totalTrips = json.optLong("totalTrips", 0L),
                     totalDistanceKm = json.optDouble("totalDistanceKm", 0.0),
                     totalMaintenanceCost = json.optDouble("totalMaintenanceCost", 0.0)

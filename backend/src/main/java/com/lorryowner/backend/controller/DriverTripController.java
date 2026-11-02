@@ -16,6 +16,7 @@ import com.lorryowner.backend.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -248,7 +249,7 @@ public class DriverTripController {
      * Transitions trip lifecycle from IN_PROGRESS to COMPLETED.
      * POST /api/driver/trips/{id}/complete
      */
-    @PostMapping("/trips/{id}/complete")
+    @PostMapping(value = "/trips/{id}/complete", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.ALL_VALUE})
     @Transactional
     public ResponseEntity<TripDto> completeTrip(
             @PathVariable Long id,

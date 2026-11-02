@@ -31,22 +31,36 @@ public class OwnerDashboardService {
     }
 
     public OwnerDashboardResponse getDashboardData(String username) {
-        // Resolve owner display name
+        // Resolve owner display name and owner entity
+        User owner = null;
         String ownerName = "Owner";
         if (username != null && !username.isBlank()) {
-            ownerName = userRepository.findByUsername(username)
-                    .map(User::getFullName)
-                    .filter(name -> !name.isBlank())
-                    .orElse(username);
+            owner = userRepository.findByUsername(username).orElse(null);
+            if (owner != null) {
+                ownerName = (owner.getFullName() != null && !owner.getFullName().isBlank())
+                        ? owner.getFullName()
+                        : username;
+            }
         }
 
-        // Real fleet counts calculated directly from MySQL database
-        long runningNow = lorryRepository.countByOperationalStatus(OperationalStatus.ON_TRIP);
-        long readyToStart = lorryRepository.countByOperationalStatus(OperationalStatus.AVAILABLE);
-        long notReady = lorryRepository.countByOperationalStatusIn(
-                List.of(OperationalStatus.MAINTENANCE, OperationalStatus.UNAVAILABLE)
-        );
-        long totalLorries = lorryRepository.count();
+        // Real fleet counts calculated directly from MySQL database scoped by owner
+        long runningNow = owner != null
+                ? lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.ON_TRIP)
+                : lorryRepository.countByOperationalStatus(OperationalStatus.ON_TRIP);
+        long readyToStart = owner != null
+                ? lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.AVAILABLE)
+                : lorryRepository.countByOperationalStatus(OperationalStatus.AVAILABLE);
+        long totalLorries = owner != null
+                ? lorryRepository.countByOwner(owner)
+                : lorryRepository.count();
+        long notReady = owner != null
+                ? lorryRepository.countByOwnerAndOperationalStatusIn(
+                        owner,
+                        List.of(OperationalStatus.MAINTENANCE, OperationalStatus.UNAVAILABLE, OperationalStatus.LOADING)
+                )
+                : lorryRepository.countByOperationalStatusIn(
+                        List.of(OperationalStatus.MAINTENANCE, OperationalStatus.UNAVAILABLE, OperationalStatus.LOADING)
+                );
 
         FleetOverviewDto fleetOverview = new FleetOverviewDto(
                 runningNow,
@@ -65,8 +79,10 @@ public class OwnerDashboardService {
                 "₹"
         );
 
-        // Real activity items derived from registered fleet lorries
-        List<Lorry> lorries = lorryRepository.findAllByOrderByUpdatedAtDesc();
+        // Real activity items derived from registered fleet lorries belonging to the owner
+        List<Lorry> lorries = owner != null
+                ? lorryRepository.findByOwnerOrderByUpdatedAtDesc(owner)
+                : lorryRepository.findAllByOrderByUpdatedAtDesc();
         List<RecentActivityDto> recentActivities = new ArrayList<>();
         Instant now = Instant.now();
 
@@ -122,6 +138,7 @@ public class OwnerDashboardService {
     private String getDefaultStatusDescription(OperationalStatus status) {
         return switch (status) {
             case ON_TRIP -> "Load completed - on the road";
+            case LOADING -> "Loading cargo in dock";
             case AVAILABLE -> "Ready for dispatch";
             case MAINTENANCE -> "In maintenance workshop";
             case UNAVAILABLE -> "Unloaded - waiting for load";

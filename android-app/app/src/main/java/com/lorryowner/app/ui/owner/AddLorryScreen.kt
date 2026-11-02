@@ -122,9 +122,10 @@ fun AddLorryScreen(
                     }
 
                     // Save Lorry Button
+                    val context = androidx.compose.ui.platform.LocalContext.current
                     Button(
                         onClick = {
-                            viewModel.submitLorry { createdId ->
+                            viewModel.submitLorry(context) { createdId ->
                                 onLorryCreated(createdId)
                             }
                         },
@@ -148,7 +149,7 @@ fun AddLorryScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Saving...",
+                                text = state.uploadProgressText ?: "Saving...",
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
@@ -422,11 +423,23 @@ fun AddLorryScreen(
                             }
                             DropdownMenu(
                                 expanded = showVehicleTypeDropdown,
-                                onDismissRequest = { showVehicleTypeDropdown = false }
+                                onDismissRequest = { showVehicleTypeDropdown = false },
+                                modifier = Modifier.background(Color.White)
                             ) {
                                 VEHICLE_TYPE_OPTIONS.forEach { option ->
+                                    val isSelected = option == state.vehicleType
                                     DropdownMenuItem(
-                                        text = { Text(option, fontSize = 13.sp) },
+                                        text = {
+                                            Text(
+                                                text = option,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) BhpDarkForestGreen else BhpTextPrimary
+                                            )
+                                        },
+                                        colors = MenuDefaults.itemColors(
+                                            textColor = BhpTextPrimary
+                                        ),
                                         onClick = {
                                             viewModel.onVehicleTypeChange(option)
                                             showVehicleTypeDropdown = false
@@ -714,6 +727,16 @@ fun AddLorryScreen(
                 }
             }
 
+            // Section 4: Vehicle Documents (Optional)
+            com.lorryowner.app.ui.components.DocumentUploadStagingSection(
+                title = "Vehicle Documents",
+                subtitle = "RC, Insurance, Fitness Certificate, Permit, PUC",
+                stagedDocuments = state.stagedDocuments,
+                onAddStagedDocument = { viewModel.onAddStagedDocument(it) },
+                onRemoveStagedDocument = { viewModel.onRemoveStagedDocument(it) },
+                suggestedDocumentTypes = listOf("RC", "Insurance", "Fitness Certificate", "Permit", "PUC")
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
@@ -722,6 +745,9 @@ fun AddLorryScreen(
     if (showDriverDialog) {
         AlertDialog(
             onDismissRequest = { showDriverDialog = false },
+            containerColor = Color.White,
+            titleContentColor = BhpTextPrimary,
+            textContentColor = BhpTextPrimary,
             title = {
                 Text(
                     text = "Select Driver",

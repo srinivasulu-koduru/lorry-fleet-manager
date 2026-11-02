@@ -20,7 +20,11 @@ data class MaintenanceDashboardUiState(
     val totalVehicles: Long = 0,
     val dueSoonCount: Long = 0,
     val overdueCount: Long = 0,
+    val upToDateCount: Long = 0,
     val totalExpenditure: Double = 0.0,
+    val currentMonthExpense: Double = 0.0,
+    val currentMonth: String = "",
+    val currentYear: Int = 0,
     val vehicles: List<VehicleMaintenanceSummaryItem> = emptyList(),
     val isLoading: Boolean = false,
     val errorMessage: String? = null
@@ -78,6 +82,31 @@ object MaintenanceFormattingHelper {
             formatter.format(amount)
         } catch (e: Exception) {
             "₹${amount.toLong()}"
+        }
+    }
+
+    data class DateBadgeParts(
+        val day: String,
+        val month: String,
+        val year: String
+    )
+
+    fun parseDateBadge(rawDate: String?): DateBadgeParts {
+        if (rawDate.isNullOrBlank()) return DateBadgeParts("--", "---", "----")
+        return try {
+            val parsed = LocalDate.parse(rawDate.trim())
+            DateBadgeParts(
+                day = String.format("%02d", parsed.dayOfMonth),
+                month = parsed.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() },
+                year = parsed.year.toString()
+            )
+        } catch (e: Exception) {
+            val parts = rawDate.trim().split("-")
+            if (parts.size == 3) {
+                DateBadgeParts(parts[2], parts[1], parts[0])
+            } else {
+                DateBadgeParts(rawDate.take(2), "--", "")
+            }
         }
     }
 }

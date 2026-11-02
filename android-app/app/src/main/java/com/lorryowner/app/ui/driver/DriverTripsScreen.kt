@@ -12,8 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.ui.components.*
@@ -32,21 +34,21 @@ fun DriverTripsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BhpScreenBg)
+            .background(Color(0xFFF8FAFC))
     ) {
-        // Top App Bar
-        DriverTopAppBar(
+        // 1. Top App Bar
+        DriverTripsTopBar(
             title = "My Trips",
             onBack = onBack
         )
 
-        // Segmented Tabs (Current, Upcoming, Completed)
+        // 2. 4 Organized Tabs: Active, Upcoming, Completed, Cancelled
         DriverTripsTabRow(
             selectedTab = selectedTab,
             onTabSelected = { viewModel.selectTripsTab(it) }
         )
 
-        // Trips List
+        // 3. Trips List or Empty State
         if (trips.isEmpty()) {
             DriverTripsEmptyState(tab = selectedTab)
         } else {
@@ -67,39 +69,49 @@ fun DriverTripsScreen(
 }
 
 @Composable
-fun DriverTopAppBar(
+fun DriverTripsTopBar(
     title: String,
     onBack: () -> Unit,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     Surface(
         color = Color.White,
-        shadowElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(width = 1.dp, color = Color(0xFFE2E8F0))
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             IconButton(
                 onClick = onBack,
                 modifier = Modifier.size(36.dp)
             ) {
-                BackArrowIcon(tint = BhpTextPrimary, modifier = Modifier.size(20.dp))
+                BackArrowIcon(tint = Color(0xFF0F172A), modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = title,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = BhpTextPrimary,
+                color = Color(0xFF0F172A),
                 modifier = Modifier.weight(1f)
             )
             actions()
         }
     }
+}
+
+@Composable
+fun DriverTopAppBar(
+    title: String,
+    onBack: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {}
+) {
+    DriverTripsTopBar(title = title, onBack = onBack, actions = actions)
 }
 
 @Composable
@@ -109,34 +121,32 @@ private fun DriverTripsTabRow(
 ) {
     Surface(
         color = Color.White,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(width = 1.dp, color = Color(0xFFE2E8F0))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             DriverTripsTab.values().forEach { tab ->
                 val isSelected = tab == selectedTab
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isSelected) Color(0xFFECFDF5) else Color.Transparent)
                         .clickable { onTabSelected(tab) }
-                        .padding(top = 12.dp)
+                        .padding(vertical = 8.dp)
                 ) {
                     Text(
                         text = tab.label,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 14.sp,
-                        color = if (isSelected) BhpDriverBlue else BhpTextSecondary,
-                        modifier = Modifier.padding(bottom = 10.dp)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .background(if (isSelected) BhpDriverBlue else Color.Transparent)
+                        fontSize = 13.sp,
+                        color = if (isSelected) Color(0xFF15803D) else Color(0xFF64748B)
                     )
                 }
             }
@@ -152,11 +162,15 @@ fun DriverTripCard(
 ) {
     val isProgress = trip.tripStatus.equals("IN_PROGRESS", ignoreCase = true)
     val isCompleted = trip.tripStatus.equals("COMPLETED", ignoreCase = true)
+    val isPlanned = trip.tripStatus.equals("PLANNED", ignoreCase = true)
+    val isCancelled = trip.tripStatus.equals("CANCELLED", ignoreCase = true)
 
     val (chipBg, chipColor, chipLabel) = when {
-        isProgress -> Triple(BhpNotReadyAmberBg, BhpNotReadyAmberText, "IN PROGRESS")
-        isCompleted -> Triple(Color(0xFFF1F5F9), Color(0xFF64748B), "COMPLETED")
-        else -> Triple(BhpRunningGreenBg, BhpRunningGreenText, "PLANNED")
+        isProgress -> Triple(Color(0xFFECFDF5), Color(0xFF15803D), "IN PROGRESS")
+        isCompleted -> Triple(Color(0xFFF1F5F9), Color(0xFF475569), "COMPLETED")
+        isPlanned -> Triple(Color(0xFFEFF6FF), Color(0xFF1D4ED8), "SCHEDULED")
+        isCancelled -> Triple(Color(0xFFFEF2F2), Color(0xFFDC2626), "CANCELLED")
+        else -> Triple(Color(0xFFF1F5F9), Color(0xFF475569), trip.tripStatus.uppercase())
     }
 
     Card(
@@ -164,19 +178,26 @@ fun DriverTripCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, BhpCardBorder, RoundedCornerShape(16.dp))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
             .clickable { onClick() }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header Row: Status badge + Reference + Chevron
+            // Header Row: Reference + Status Chip
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                Text(
+                    text = trip.tripReference,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Color(0xFF0F172A)
+                )
+
                 Surface(
                     color = chipBg,
-                    shape = RoundedCornerShape(6.dp)
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = chipLabel,
@@ -186,88 +207,100 @@ fun DriverTripCard(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = trip.tripReference,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = BhpDriverBlue
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    ChevronRightIcon(tint = BhpTextSecondary, modifier = Modifier.size(16.dp))
-                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Date Range
+            // Vehicle Row: Lorry registration & Model
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CalendarIcon(tint = BhpTextSecondary, modifier = Modifier.size(15.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = trip.tripDate.ifEmpty { "Active Schedule" },
-                    fontSize = 12.sp,
-                    color = BhpTextSecondary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Route
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LocationPinIcon(tint = Color(0xFF10B981), modifier = Modifier.size(15.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = trip.originLocation,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    color = BhpTextPrimary
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "→", color = BhpTextSecondary, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.width(6.dp))
-                LocationPinIcon(tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = trip.destinationLocation,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    color = BhpTextPrimary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Lorry registration
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                DashboardTruckIcon(tint = BhpTextSecondary, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+                DashboardTruckIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 val lorryText = buildString {
                     append(trip.lorryRegistration)
                     if (!trip.lorryMakeModel.isNullOrBlank()) {
-                        append(" | ")
+                        append(" • ")
                         append(trip.lorryMakeModel)
                     }
                 }
                 Text(
                     text = lorryText,
-                    fontSize = 12.sp,
-                    color = BhpTextSecondary
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F172A)
                 )
             }
 
-            // Driver row
-            if (trip.driverName.isNotBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    DriverCapIcon(tint = BhpTextSecondary, modifier = Modifier.size(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Route: Source -> Destination
+            Surface(
+                color = Color(0xFFF8FAFC),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF16A34A))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = trip.originLocation,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Color(0xFF0F172A),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "→",
+                        color = Color(0xFF94A3B8),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+                    LocationPinIcon(tint = Color(0xFF2563EB), modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = trip.driverName,
-                        fontSize = 12.sp,
-                        color = BhpTextSecondary
+                        text = trip.destinationLocation,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Color(0xFF0F172A),
+                        modifier = Modifier.weight(1f)
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Bottom Info: Date & View Details Link
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CalendarIcon(tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = trip.tripDate.ifEmpty { "Active Schedule" },
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Details",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF16A34A)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    ChevronRightIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -284,12 +317,12 @@ private fun DriverTripsEmptyState(tab: DriverTripsTab) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(
-                color = Color(0xFFEFF6FF),
+                color = Color(0xFFF1F5F9),
                 shape = CircleShape,
                 modifier = Modifier.size(56.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    DashboardTruckIcon(tint = BhpDriverBlue, modifier = Modifier.size(28.dp))
+                    DashboardTruckIcon(tint = Color(0xFF64748B), modifier = Modifier.size(28.dp))
                 }
             }
             Spacer(modifier = Modifier.height(14.dp))
@@ -297,19 +330,20 @@ private fun DriverTripsEmptyState(tab: DriverTripsTab) {
                 DriverTripsTab.CURRENT -> "No trips currently in progress"
                 DriverTripsTab.UPCOMING -> "No upcoming trips scheduled"
                 DriverTripsTab.COMPLETED -> "No completed trips on record"
+                DriverTripsTab.CANCELLED -> "No cancelled trips on record"
             }
             Text(
                 text = message,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = BhpTextPrimary
+                color = Color(0xFF0F172A)
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "When trips are assigned by the fleet owner, they will appear here.",
                 fontSize = 13.sp,
-                color = BhpTextSecondary,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                color = Color(0xFF64748B),
+                textAlign = TextAlign.Center
             )
         }
     }

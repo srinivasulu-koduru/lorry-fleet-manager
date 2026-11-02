@@ -24,6 +24,9 @@ import com.lorryowner.app.ui.components.ClockTimerIcon
 import com.lorryowner.app.ui.components.DriverCapIcon
 import com.lorryowner.app.ui.components.LocationPinIcon
 import com.lorryowner.app.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun LorryTripHistoryScreen(
@@ -34,6 +37,7 @@ fun LorryTripHistoryScreen(
 ) {
     val viewModel = remember(lorryId) { LorryDetailsViewModel(lorryId, sessionManager) }
     val state = viewModel.uiState
+    var tripToCancel by remember { mutableStateOf<TripItemUiState?>(null) }
 
     Scaffold(
         topBar = {
@@ -146,17 +150,76 @@ fun LorryTripHistoryScreen(
                     items(state.filteredTrips, key = { it.id }) { trip ->
                         TripCardItem(
                             trip = trip,
-                            onClick = { viewModel.selectTripForDetails(trip) }
+                            onClick = { viewModel.selectTripForDetails(trip) },
+                            onCancelTripClick = { tripToCancel = trip }
                         )
                     }
                 }
             }
 
-            // Screen 6: Trip Details Dialog
+            // Trip Details Dialog
             if (state.selectedTripForDetails != null) {
                 TripDetailsModal(
                     trip = state.selectedTripForDetails!!,
-                    onDismiss = { viewModel.selectTripForDetails(null) }
+                    sessionManager = sessionManager,
+                    onDismiss = { viewModel.selectTripForDetails(null) },
+                    onCancelClick = {
+                        val current = state.selectedTripForDetails
+                        viewModel.selectTripForDetails(null)
+                        tripToCancel = current
+                    }
+                )
+            }
+
+            // Cancel Trip Confirmation Dialog
+            if (tripToCancel != null) {
+                val trip = tripToCancel!!
+                AlertDialog(
+                    onDismissRequest = { tripToCancel = null },
+                    containerColor = Color.White,
+                    titleContentColor = BhpTextPrimary,
+                    textContentColor = BhpTextPrimary,
+                    title = {
+                        Text("Cancel Trip", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = BhpTextPrimary)
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Are you sure you want to cancel this planned trip?",
+                                color = BhpTextPrimary,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Trip: ${trip.tripReference} (${trip.originLocation} → ${trip.destinationLocation})",
+                                color = BhpTextSecondary,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "This action will permanently set the trip status to Cancelled.",
+                                color = BhpErrorRed,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val idToCancel = trip.id
+                                tripToCancel = null
+                                viewModel.cancelTrip(idToCancel)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = BhpErrorRed)
+                        ) {
+                            Text("Yes, Cancel Trip", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = { tripToCancel = null }) {
+                            Text("Keep Trip", color = BhpTextSecondary)
+                        }
+                    }
                 )
             }
         }
@@ -167,6 +230,7 @@ fun LorryTripHistoryScreen(
 fun TripCardItem(
     trip: TripItemUiState,
     onClick: () -> Unit,
+    onCancelTripClick: (TripItemUiState) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -274,6 +338,33 @@ fun TripCardItem(
                     modifier = Modifier.size(18.dp)
                 )
             }
+
+            // Cancel action button when trip is in PLANNED status
+            if (trip.tripStatus.equals("PLANNED", ignoreCase = true)) {
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = { onCancelTripClick(trip) },
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BhpErrorRed),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "✕ Cancel Trip",
+                            color = BhpErrorRed,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -284,6 +375,7 @@ fun TripStatusBadge(status: String, modifier: Modifier = Modifier) {
         "COMPLETED" -> Triple(BhpRunningGreenBg, BhpRunningGreenText, "Completed")
         "IN_PROGRESS" -> Triple(BhpReadyBlueBg, BhpReadyBlueText, "In Progress")
         "CANCELLED" -> Triple(Color(0xFFFEE2E2), Color(0xFFDC2626), "Cancelled")
+        "PLANNED" -> Triple(Color(0xFFFEF3C7), Color(0xFFB45309), "Planned")
         else -> Triple(Color(0xFFF1F5F9), Color(0xFF475569), status)
     }
 
@@ -307,10 +399,57 @@ fun TripStatusBadge(status: String, modifier: Modifier = Modifier) {
 @Composable
 fun TripDetailsModal(
     trip: TripItemUiState,
-    onDismiss: () -> Unit
+    sessionManager: SessionManager? = null,
+    onDismiss: () -> Unit,
+    onCancelClick: (() -> Unit)? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var tripDocuments by remember { mutableStateOf<List<com.lorryowner.app.network.DocumentUiItem>>(emptyList()) }
+    var isLoadingDocs by remember { mutableStateOf(true) }
+    var showUploadDocDialog by remember { mutableStateOf(false) }
+    var selectedDocUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var selectedDocName by remember { mutableStateOf("") }
+    var docTitleInput by remember { mutableStateOf("") }
+    var uploadDialogError by remember { mutableStateOf<String?>(null) }
+
+    val docPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val (fname, _) = com.lorryowner.app.network.DocumentApiService.extractFileInfoFromUri(context, uri)
+            selectedDocUri = uri
+            selectedDocName = fname
+            if (docTitleInput.isBlank()) {
+                docTitleInput = fname.substringBeforeLast(".")
+            }
+        }
+    }
+
+    fun reloadDocs() {
+        coroutineScope.launch {
+            isLoadingDocs = true
+            val res = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.lorryowner.app.network.DocumentApiService.fetchDocuments(
+                    sessionManager = sessionManager,
+                    endpointPath = "/api/owner/trips/${trip.id}/documents"
+                )
+            }
+            isLoadingDocs = false
+            if (res.isSuccess) {
+                tripDocuments = res.getOrDefault(emptyList())
+            }
+        }
+    }
+
+    LaunchedEffect(trip.id) {
+        reloadDocs()
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        titleContentColor = BhpTextPrimary,
+        textContentColor = BhpTextPrimary,
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -320,7 +459,8 @@ fun TripDetailsModal(
                 Text(
                     text = trip.tripReference,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    fontSize = 18.sp,
+                    color = BhpTextPrimary
                 )
                 TripStatusBadge(status = trip.tripStatus)
             }
@@ -356,6 +496,10 @@ fun TripDetailsModal(
                 Text(
                     text = if (trip.tripStatus == "COMPLETED")
                         "🏁 Reached Destination: ${trip.endTime?.take(16)?.replace("T", " ") ?: "Not recorded"}"
+                    else if (trip.tripStatus == "CANCELLED")
+                        "🚫 Cancelled"
+                    else if (trip.tripStatus == "PLANNED")
+                        "⏳ Scheduled (Not Started)"
                     else
                         "⏳ In Progress",
                     fontSize = 12.sp,
@@ -372,18 +516,178 @@ fun TripDetailsModal(
 
                 if (trip.deliveryNotes != null && trip.deliveryNotes.isNotBlank()) {
                     HorizontalDivider(color = Color(0xFFF1F5F9))
-                    Text("📝 Notes:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("📝 Notes:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = BhpTextPrimary)
                     Text(trip.deliveryNotes, fontSize = 12.sp, color = BhpTextSecondary)
+                }
+
+                // Trip Documents Section
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Trip Documents (${tripDocuments.size})",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = BhpTextPrimary
+                    )
+
+                    TextButton(
+                        onClick = {
+                            selectedDocUri = null
+                            selectedDocName = ""
+                            docTitleInput = ""
+                            uploadDialogError = null
+                            showUploadDocDialog = true
+                        },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text("+ Add Document", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = BhpDarkForestGreen)
+                    }
+                }
+
+                if (isLoadingDocs) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = BhpDarkForestGreen)
+                    }
+                } else if (tripDocuments.isEmpty()) {
+                    Text(
+                        text = "No trip documents uploaded yet.",
+                        fontSize = 12.sp,
+                        color = BhpTextSecondary
+                    )
+                } else {
+                    for (doc in tripDocuments) {
+                        com.lorryowner.app.ui.components.DocumentCard(
+                            document = doc,
+                            sessionManager = sessionManager,
+                            canDelete = true,
+                            onDelete = { toDelete ->
+                                coroutineScope.launch {
+                                    val delRes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        com.lorryowner.app.network.DocumentApiService.deleteDocument(
+                                            sessionManager = sessionManager,
+                                            endpointPath = "/api/owner/trips/${trip.id}/documents/${toDelete.id}"
+                                        )
+                                    }
+                                    if (delRes.isSuccess) reloadDocs()
+                                }
+                            }
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = BhpDarkForestGreen)
-            ) {
-                Text("Close")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (trip.tripStatus.equals("PLANNED", ignoreCase = true) && onCancelClick != null) {
+                    OutlinedButton(
+                        onClick = onCancelClick,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BhpErrorRed)
+                    ) {
+                        Text("Cancel Trip", color = BhpErrorRed, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = BhpDarkForestGreen)
+                ) {
+                    Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         }
     )
+
+    if (showUploadDocDialog) {
+        AlertDialog(
+            onDismissRequest = { showUploadDocDialog = false },
+            containerColor = Color.White,
+            title = { Text("Upload Trip Document", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val suggestions = listOf("E-Way Bill", "Tax Invoice", "Delivery Challan", "Lorry Receipt (LR)")
+                    Text("Suggested Types:", fontSize = 11.sp, color = BhpTextSecondary)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        suggestions.take(3).forEach { s ->
+                            FilterChip(
+                                selected = docTitleInput == s,
+                                onClick = { docTitleInput = s },
+                                label = { Text(s, fontSize = 10.sp) }
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = docTitleInput,
+                        onValueChange = {
+                            docTitleInput = it
+                            uploadDialogError = null
+                        },
+                        label = { Text("Document Title *") },
+                        placeholder = { Text("e.g. E-Way Bill") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+
+                    OutlinedButton(
+                        onClick = { docPickerLauncher.launch("*/*") },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (selectedDocName.isNotBlank()) selectedDocName else "Choose PDF or Image")
+                    }
+
+                    if (uploadDialogError != null) {
+                        Text(uploadDialogError!!, color = BhpErrorRed, fontSize = 11.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (docTitleInput.trim().isBlank()) {
+                            uploadDialogError = "Document title is required"
+                            return@Button
+                        }
+                        val uri = selectedDocUri
+                        if (uri == null) {
+                            uploadDialogError = "Please select a file"
+                            return@Button
+                        }
+                        coroutineScope.launch {
+                            val upRes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                com.lorryowner.app.network.DocumentApiService.uploadDocument(
+                                    context = context,
+                                    sessionManager = sessionManager,
+                                    endpointPath = "/api/owner/trips/${trip.id}/documents",
+                                    documentTitle = docTitleInput.trim(),
+                                    fileUri = uri
+                                )
+                            }
+                            if (upRes.isSuccess) {
+                                showUploadDocDialog = false
+                                reloadDocs()
+                            } else {
+                                uploadDialogError = upRes.exceptionOrNull()?.message ?: "Upload failed"
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BhpDarkForestGreen)
+                ) {
+                    Text("Upload", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUploadDocDialog = false }) {
+                    Text("Cancel", color = BhpTextSecondary)
+                }
+            }
+        )
+    }
 }

@@ -14,5 +14,19 @@ public record VehicleMaintenanceDetailsResponse(
         LocalDate nextServiceDate,
         String status,
         BigDecimal totalMaintenanceCost,
+        int totalRecordsCount,
         List<MaintenanceRecordDto> records
-) {}
+) {
+    public VehicleMaintenanceDetailsResponse(
+            Long lorryId,
+            String registrationNumber,
+            String makeModel,
+            LocalDate lastServiceDate,
+            LocalDate nextServiceDate,
+            String status,
+            BigDecimal totalMaintenanceCost,
+            List<MaintenanceRecordDto> records
+    ) {
+        this(lorryId, registrationNumber, makeModel, lastServiceDate, nextServiceDate, status, totalMaintenanceCost, records != null ? records.size() : 0, records);
+    }
+}

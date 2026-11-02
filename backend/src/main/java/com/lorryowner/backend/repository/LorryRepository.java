@@ -30,31 +30,34 @@ public interface LorryRepository extends JpaRepository<Lorry, Long> {
 
     List<Lorry> findAllByOrderByUpdatedAtDesc();
 
-    @Query("SELECT l FROM Lorry l WHERE (l.owner = :owner OR l.owner IS NULL) ORDER BY l.registrationNumber ASC")
+    @Query("SELECT l FROM Lorry l WHERE l.owner = :owner ORDER BY l.updatedAt DESC")
+    List<Lorry> findByOwnerOrderByUpdatedAtDesc(@Param("owner") com.lorryowner.backend.entity.User owner);
+
+    @Query("SELECT l FROM Lorry l WHERE l.owner = :owner ORDER BY l.registrationNumber ASC")
     List<Lorry> findByOwnerOrderByRegistrationNumberAsc(@Param("owner") com.lorryowner.backend.entity.User owner);
 
-    @Query("SELECT l FROM Lorry l WHERE (l.owner = :owner OR l.owner IS NULL) AND l.operationalStatus = :status ORDER BY l.registrationNumber ASC")
+    @Query("SELECT l FROM Lorry l WHERE l.owner = :owner AND l.operationalStatus = :status ORDER BY l.registrationNumber ASC")
     List<Lorry> findByOwnerAndOperationalStatusOrderByRegistrationNumberAsc(
             @Param("owner") com.lorryowner.backend.entity.User owner,
             @Param("status") OperationalStatus status
     );
 
-    @Query("SELECT COUNT(l) FROM Lorry l WHERE (l.owner = :owner OR l.owner IS NULL)")
+    @Query("SELECT COUNT(l) FROM Lorry l WHERE l.owner = :owner")
     long countByOwner(@Param("owner") com.lorryowner.backend.entity.User owner);
 
-    @Query("SELECT COUNT(l) FROM Lorry l WHERE (l.owner = :owner OR l.owner IS NULL) AND l.operationalStatus = :status")
+    @Query("SELECT COUNT(l) FROM Lorry l WHERE l.owner = :owner AND l.operationalStatus = :status")
     long countByOwnerAndOperationalStatus(
             @Param("owner") com.lorryowner.backend.entity.User owner, 
             @Param("status") OperationalStatus status
     );
 
-    @Query("SELECT COUNT(l) FROM Lorry l WHERE (l.owner = :owner OR l.owner IS NULL) AND l.operationalStatus IN :statuses")
+    @Query("SELECT COUNT(l) FROM Lorry l WHERE l.owner = :owner AND l.operationalStatus IN :statuses")
     long countByOwnerAndOperationalStatusIn(
             @Param("owner") com.lorryowner.backend.entity.User owner,
             @Param("statuses") Collection<OperationalStatus> statuses
     );
 
-    @Query("SELECT l FROM Lorry l WHERE l.id = :id AND (l.owner = :owner OR l.owner IS NULL)")
+    @Query("SELECT l FROM Lorry l WHERE l.id = :id AND l.owner = :owner")
     Optional<Lorry> findByIdAndOwner(
             @Param("id") Long id, 
             @Param("owner") com.lorryowner.backend.entity.User owner

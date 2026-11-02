@@ -81,7 +81,9 @@ data class AddTripUiState(
     val generalError: String? = null,
 
     val isSubmitting: Boolean = false,
-    val createdTripResult: CreatedTripUiState? = null
+    val createdTripResult: CreatedTripUiState? = null,
+    val stagedDocuments: List<com.lorryowner.app.network.StagedDocument> = emptyList(),
+    val uploadProgressText: String? = null
 )
 
 class AddTripViewModel(
@@ -296,7 +298,18 @@ class AddTripViewModel(
         return !hasError
     }
 
-    fun submitTrip(onSuccess: (CreatedTripUiState) -> Unit) {
+    fun onAddStagedDocument(doc: com.lorryowner.app.network.StagedDocument) {
+        uiState = uiState.copy(stagedDocuments = uiState.stagedDocuments + doc)
+    }
+
+    fun onRemoveStagedDocument(index: Int) {
+        if (index in uiState.stagedDocuments.indices) {
+            val updated = uiState.stagedDocuments.toMutableList().apply { removeAt(index) }
+            uiState = uiState.copy(stagedDocuments = updated)
+        }
+    }
+
+    fun submitTrip(context: android.content.Context? = null, onSuccess: (CreatedTripUiState) -> Unit) {
         if (!validateForm()) return
         if (uiState.isSubmitting) return
 
@@ -305,17 +318,29 @@ class AddTripViewModel(
             val result = withContext(Dispatchers.IO) {
                 executeCreateTrip()
             }
-            uiState = uiState.copy(isSubmitting = false)
-            when {
-                result.isSuccess -> {
-                    val created = result.getOrThrow()
-                    uiState = uiState.copy(createdTripResult = created)
-                    onSuccess(created)
+            if (result.isSuccess) {
+                val created = result.getOrThrow()
+                if (context != null && uiState.stagedDocuments.isNotEmpty()) {
+                    withContext(Dispatchers.IO) {
+                        for ((idx, doc) in uiState.stagedDocuments.withIndex()) {
+                            uiState = uiState.copy(uploadProgressText = "Uploading document ${idx + 1}/${uiState.stagedDocuments.size}...")
+                            if (doc.uri != null) {
+                                com.lorryowner.app.network.DocumentApiService.uploadDocument(
+                                    context = context,
+                                    sessionManager = sessionManager,
+                                    endpointPath = "/api/owner/trips/${created.id}/documents",
+                                    documentTitle = doc.title,
+                                    fileUri = doc.uri
+                                )
+                            }
+                        }
+                    }
                 }
-                else -> {
-                    val errorMsg = result.exceptionOrNull()?.message ?: "Failed to create trip. Please try again."
-                    uiState = uiState.copy(generalError = errorMsg)
-                }
+                uiState = uiState.copy(isSubmitting = false, uploadProgressText = null, createdTripResult = created)
+                onSuccess(created)
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Failed to create trip. Please try again."
+                uiState = uiState.copy(isSubmitting = false, uploadProgressText = null, generalError = errorMsg)
             }
         }
     }

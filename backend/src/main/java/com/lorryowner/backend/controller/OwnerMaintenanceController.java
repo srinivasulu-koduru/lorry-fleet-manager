@@ -3,7 +3,9 @@ package com.lorryowner.backend.controller;
 import com.lorryowner.backend.dto.lorry.MaintenanceRecordDto;
 import com.lorryowner.backend.dto.maintenance.CreateMaintenanceRecordRequest;
 import com.lorryowner.backend.dto.maintenance.MaintenanceSummaryResponse;
+import com.lorryowner.backend.dto.maintenance.MonthlyMaintenanceExpenseDto;
 import com.lorryowner.backend.dto.maintenance.VehicleMaintenanceDetailsResponse;
+import com.lorryowner.backend.dto.maintenance.VehicleMaintenanceSummaryDto;
 import com.lorryowner.backend.service.OwnerMaintenanceService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -32,13 +34,38 @@ public class OwnerMaintenanceController {
 
     /**
      * Retrieves maintenance summary for the authenticated owner's fleet,
-     * including vehicle status counts (Total, Due Soon, Overdue) and per-vehicle cards.
+     * including vehicle status counts (Total, Due Soon, Overdue), current month's expenses, and per-vehicle cards.
      */
     @GetMapping("/summary")
     public ResponseEntity<MaintenanceSummaryResponse> getMaintenanceSummary(Authentication authentication) {
         String username = authentication != null ? authentication.getName() : null;
         MaintenanceSummaryResponse summary = ownerMaintenanceService.getMaintenanceSummary(username);
         return ResponseEntity.ok(summary);
+    }
+
+    /**
+     * Retrieves current month's maintenance expense for the authenticated owner's fleet.
+     * Optionally accepts custom year and month parameters.
+     */
+    @GetMapping("/monthly-expense")
+    public ResponseEntity<MonthlyMaintenanceExpenseDto> getMonthlyExpense(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            Authentication authentication
+    ) {
+        String username = authentication != null ? authentication.getName() : null;
+        MonthlyMaintenanceExpenseDto expense = ownerMaintenanceService.getMonthlyExpense(username, year, month);
+        return ResponseEntity.ok(expense);
+    }
+
+    /**
+     * Lists the authenticated owner's lorries with their maintenance record counts and summary.
+     */
+    @GetMapping("/lorries")
+    public ResponseEntity<List<VehicleMaintenanceSummaryDto>> getOwnerLorries(Authentication authentication) {
+        String username = authentication != null ? authentication.getName() : null;
+        List<VehicleMaintenanceSummaryDto> lorries = ownerMaintenanceService.getOwnerLorries(username);
+        return ResponseEntity.ok(lorries);
     }
 
     /**

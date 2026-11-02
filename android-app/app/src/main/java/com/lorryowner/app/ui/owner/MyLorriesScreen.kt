@@ -1,12 +1,15 @@
 package com.lorryowner.app.ui.owner
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -180,7 +183,9 @@ fun MyLorriesScreen(
 
                             // Filter Chips
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 FilterChip(
@@ -194,9 +199,19 @@ fun MyLorriesScreen(
                                     label = { Text("Running (${state.summary.runningLorries})") }
                                 )
                                 FilterChip(
+                                    selected = state.filter == LorryFilter.LOADING,
+                                    onClick = { viewModel.onFilterSelected(LorryFilter.LOADING) },
+                                    label = { Text("Loading (${state.summary.loadingLorries})") }
+                                )
+                                FilterChip(
+                                    selected = state.filter == LorryFilter.AVAILABLE,
+                                    onClick = { viewModel.onFilterSelected(LorryFilter.AVAILABLE) },
+                                    label = { Text("Available (${state.summary.availableLorries})") }
+                                )
+                                FilterChip(
                                     selected = state.filter == LorryFilter.NOT_RUNNING,
                                     onClick = { viewModel.onFilterSelected(LorryFilter.NOT_RUNNING) },
-                                    label = { Text("Not Running (${state.summary.notRunningLorries})") }
+                                    label = { Text("Not Ready (${state.summary.notReadyLorries})") }
                                 )
                             }
                         }
@@ -287,20 +302,22 @@ fun CircularFleetStatusCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceAround
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 // Donut Chart with center count
+                val total = summary.totalLorries
+                val runningSweep = if (total > 0) (summary.runningLorries.toFloat() / total.toFloat()) * 360f else 0f
+                val loadingSweep = if (total > 0) (summary.loadingLorries.toFloat() / total.toFloat()) * 360f else 0f
+                val availableSweep = if (total > 0) (summary.availableLorries.toFloat() / total.toFloat()) * 360f else 0f
+                val notReadySweep = if (total > 0) (summary.notReadyLorries.toFloat() / total.toFloat()) * 360f else 0f
+
                 Box(
                     modifier = Modifier.size(130.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    val runningSweep = if (summary.totalLorries > 0) {
-                        (summary.runningLorries.toFloat() / summary.totalLorries.toFloat()) * 360f
-                    } else 0f
-
                     Canvas(modifier = Modifier.fillMaxSize().padding(10.dp)) {
-                        val strokeWidth = 16.dp.toPx()
-                        // Track background (Not running arc)
+                        val strokeWidth = 14.dp.toPx()
+                        // Track background when 0
                         drawArc(
                             color = Color(0xFFE2E8F0),
                             startAngle = -90f,
@@ -308,15 +325,52 @@ fun CircularFleetStatusCard(
                             useCenter = false,
                             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                         )
-                        // Running arc (Green)
-                        if (runningSweep > 0) {
-                            drawArc(
-                                color = BhpRunningGreen,
-                                startAngle = -90f,
-                                sweepAngle = runningSweep,
-                                useCenter = false,
-                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                            )
+
+                        if (total > 0) {
+                            var currentAngle = -90f
+
+                            if (runningSweep > 0) {
+                                drawArc(
+                                    color = BhpRunningGreen,
+                                    startAngle = currentAngle,
+                                    sweepAngle = runningSweep,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidth)
+                                )
+                                currentAngle += runningSweep
+                            }
+
+                            if (loadingSweep > 0) {
+                                drawArc(
+                                    color = Color(0xFFF59E0B),
+                                    startAngle = currentAngle,
+                                    sweepAngle = loadingSweep,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidth)
+                                )
+                                currentAngle += loadingSweep
+                            }
+
+                            if (availableSweep > 0) {
+                                drawArc(
+                                    color = BhpReadyBlue,
+                                    startAngle = currentAngle,
+                                    sweepAngle = availableSweep,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidth)
+                                )
+                                currentAngle += availableSweep
+                            }
+
+                            if (notReadySweep > 0) {
+                                drawArc(
+                                    color = Color(0xFF94A3B8),
+                                    startAngle = currentAngle,
+                                    sweepAngle = notReadySweep,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidth)
+                                )
+                            }
                         }
                     }
 
@@ -339,146 +393,141 @@ fun CircularFleetStatusCard(
                     }
                 }
 
-                // Legend
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .clip(CircleShape)
-                                .background(BhpRunningGreen)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Running",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = BhpTextPrimary,
-                                    fontSize = 13.sp
-                                )
-                            )
-                            Text(
-                                text = "${summary.runningLorries} (${summary.runningPercentage}%)",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = BhpTextSecondary,
-                                    fontSize = 12.sp
-                                )
-                            )
-                        }
-                    }
+                Spacer(modifier = Modifier.width(12.dp))
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF94A3B8))
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Not Running",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = BhpTextPrimary,
-                                    fontSize = 13.sp
-                                )
-                            )
-                            Text(
-                                text = "${summary.notRunningLorries} (${summary.notRunningPercentage}%)",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = BhpTextSecondary,
-                                    fontSize = 12.sp
-                                )
-                            )
-                        }
-                    }
+                // 4-category Legend with text labels and percentages
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    StatusLegendItem(
+                        color = BhpRunningGreen,
+                        label = "Running",
+                        count = summary.runningLorries,
+                        percentage = summary.runningPercentage
+                    )
+                    StatusLegendItem(
+                        color = Color(0xFFF59E0B),
+                        label = "Loading",
+                        count = summary.loadingLorries,
+                        percentage = summary.loadingPercentage
+                    )
+                    StatusLegendItem(
+                        color = BhpReadyBlue,
+                        label = "Available",
+                        count = summary.availableLorries,
+                        percentage = summary.availablePercentage
+                    )
+                    StatusLegendItem(
+                        color = Color(0xFF94A3B8),
+                        label = "Not Ready",
+                        count = summary.notReadyLorries,
+                        percentage = summary.notReadyPercentage
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Two Clickable Stat Cards below chart
+            // 4 Status Summary Metric Chips below chart
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Running Button Card
+                // Running Card
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = BhpRunningGreenBg,
-                    border = CardDefaults.outlinedCardBorder(),
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onRunningClick() }
+                    border = BorderStroke(1.dp, Color(0xFFBBF7D0)),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("🟢", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Running",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = BhpRunningGreenText,
-                                    fontSize = 14.sp
-                                )
-                            )
-                        }
-                        Text(
-                            text = "${summary.runningLorries}",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = BhpRunningGreenText,
-                                fontSize = 18.sp
-                            )
-                        )
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Running", fontSize = 10.5.sp, color = BhpRunningGreenText, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("${summary.runningLorries}", fontSize = 16.sp, color = BhpRunningGreenText, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                // Not Running Button Card
+                // Loading Card
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFF1F5F9),
-                    border = CardDefaults.outlinedCardBorder(),
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onNotRunningClick() }
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFFFEF3C7),
+                    border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("⚪", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Not Running",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF475569),
-                                    fontSize = 14.sp
-                                )
-                            )
-                        }
-                        Text(
-                            text = "${summary.notRunningLorries}",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF475569),
-                                fontSize = 18.sp
-                            )
-                        )
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Loading", fontSize = 10.5.sp, color = Color(0xFFB45309), fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("${summary.loadingLorries}", fontSize = 16.sp, color = Color(0xFFB45309), fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Available Card
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = BhpReadyBlueBg,
+                    border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Available", fontSize = 10.5.sp, color = BhpReadyBlueText, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("${summary.availableLorries}", fontSize = 16.sp, color = BhpReadyBlueText, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Not Ready Card
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFFF1F5F9),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Not Ready", fontSize = 10.5.sp, color = Color(0xFF475569), fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("${summary.notReadyLorries}", fontSize = 16.sp, color = Color(0xFF475569), fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StatusLegendItem(
+    color: Color,
+    label: String,
+    count: Long,
+    percentage: Double
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(9.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = BhpTextPrimary,
+                fontSize = 12.sp
+            ),
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$count (${percentage}%)",
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = BhpTextSecondary,
+                fontSize = 11.sp
+            )
+        )
     }
 }
 
@@ -550,7 +599,7 @@ fun LorryCardItem(
                 }
 
                 // Status Pill
-                StatusPill(running = lorry.running)
+                StatusPill(operationalStatus = lorry.operationalStatus, running = lorry.running)
             }
 
             // Driver & Destination details
@@ -616,10 +665,55 @@ fun LorryCardItem(
 }
 
 @Composable
-fun StatusPill(running: Boolean, modifier: Modifier = Modifier) {
-    val bgColor = if (running) BhpRunningGreenBg else Color(0xFFF1F5F9)
-    val textColor = if (running) BhpRunningGreenText else Color(0xFF475569)
-    val text = if (running) "Running" else "Not Running"
+fun StatusPill(
+    operationalStatus: String? = null,
+    running: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val normStatus = operationalStatus?.uppercase() ?: if (running) "ON_TRIP" else "AVAILABLE"
+    val bgColor: Color
+    val textColor: Color
+    val dotColor: Color
+    val label: String
+
+    when {
+        normStatus == "ON_TRIP" || (running && normStatus != "LOADING" && normStatus != "MAINTENANCE") -> {
+            bgColor = BhpRunningGreenBg
+            textColor = BhpRunningGreenText
+            dotColor = BhpRunningGreen
+            label = "Running"
+        }
+        normStatus == "LOADING" -> {
+            bgColor = Color(0xFFFEF3C7)
+            textColor = Color(0xFFB45309)
+            dotColor = Color(0xFFF59E0B)
+            label = "Loading"
+        }
+        normStatus == "AVAILABLE" -> {
+            bgColor = BhpReadyBlueBg
+            textColor = BhpReadyBlueText
+            dotColor = BhpReadyBlue
+            label = "Available"
+        }
+        normStatus == "MAINTENANCE" -> {
+            bgColor = Color(0xFFFEE2E2)
+            textColor = Color(0xFFDC2626)
+            dotColor = Color(0xFFDC2626)
+            label = "Maintenance"
+        }
+        normStatus == "UNAVAILABLE" -> {
+            bgColor = Color(0xFFF1F5F9)
+            textColor = Color(0xFF64748B)
+            dotColor = Color(0xFF94A3B8)
+            label = "Unavailable"
+        }
+        else -> {
+            bgColor = Color(0xFFF1F5F9)
+            textColor = Color(0xFF475569)
+            dotColor = Color(0xFF94A3B8)
+            label = normStatus
+        }
+    }
 
     Surface(
         color = bgColor,
@@ -635,11 +729,11 @@ fun StatusPill(running: Boolean, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .size(6.dp)
                     .clip(CircleShape)
-                    .background(if (running) BhpRunningGreen else Color(0xFF94A3B8))
+                    .background(dotColor)
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(
-                text = text,
+                text = label,
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = textColor,

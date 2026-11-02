@@ -34,175 +34,230 @@ fun DriverProfileScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BhpScreenBg)
+            .background(Color(0xFFF8FAFC))
             .verticalScroll(rememberScrollState())
     ) {
         // Top App Bar
         Surface(
             color = Color.White,
-            shadowElevation = 1.dp,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(width = 1.dp, color = Color(0xFFE2E8F0))
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
                 Text(
-                    text = "Profile",
+                    text = "Driver Profile",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = BhpTextPrimary
+                    color = Color(0xFF0F172A)
                 )
-                IconButton(
-                    onClick = { /* Edit profile shortcut */ },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    EditPencilIcon(tint = BhpDriverBlue, modifier = Modifier.size(18.dp))
-                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 1. Driver Avatar & Header Info
+        // 1. Profile Hero Card
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .border(1.dp, BhpCardBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(18.dp)
             ) {
-                // Driver Avatar circle with peaked cap
-                Surface(
-                    color = Color(0xFFEFF6FF),
-                    shape = CircleShape,
+                // Large Avatar Circle
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(64.dp)
-                        .border(2.dp, BhpDriverBlue, CircleShape)
+                        .size(60.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFECFDF5))
+                        .border(2.dp, Color(0xFF10B981), CircleShape)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        DriverCapIcon(tint = BhpDriverBlue, modifier = Modifier.size(36.dp))
-                    }
+                    val initial = state.fullName.firstOrNull()?.uppercaseChar()?.toString()
+                        ?: state.username.firstOrNull()?.uppercaseChar()?.toString() ?: "D"
+                    Text(
+                        text = initial,
+                        color = Color(0xFF065F46),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = state.fullName,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
-                        color = BhpTextPrimary
+                        color = Color(0xFF0F172A)
                     )
                     Text(
-                        text = state.role,
+                        text = "@${state.username}",
                         fontSize = 13.sp,
-                        color = BhpTextSecondary
+                        color = Color(0xFF64748B)
                     )
+
                     Spacer(modifier = Modifier.height(6.dp))
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (state.isOnline) Color(0xFF22C55E) else Color(0xFFEF4444))
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (state.isOnline) "Online" else "Offline",
-                            fontSize = 12.sp,
-                            color = if (state.isOnline) Color(0xFF16A34A) else Color(0xFFDC2626),
-                            fontWeight = FontWeight.Medium
-                        )
+                        Surface(
+                            color = Color(0xFFF1F5F9),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = state.role.uppercase(),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF475569),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Status dot
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(if (state.isOnline) Color(0xFF16A34A) else Color(0xFFDC2626))
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (state.isOnline) "Active" else "Offline",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (state.isOnline) Color(0xFF16A34A) else Color(0xFFDC2626)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // 2. Personal & Asset Details Card
+        // 2. Identity & Contact Information Card
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .border(1.dp, BhpCardBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                ProfileDetailRow(
-                    icon = { PhoneCallVectorIcon(tint = BhpDriverBlue, modifier = Modifier.size(16.dp)) },
-                    label = state.phoneNumber.ifEmpty { "+91 98765 43210" }
+            Column(modifier = Modifier.padding(18.dp)) {
+                Text(
+                    text = "Contact & Credentials",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Color(0xFF0F172A)
                 )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = BhpScreenBg)
 
-                ProfileDetailRow(
-                    icon = { DocumentTextIcon(tint = BhpDriverBlue, modifier = Modifier.size(16.dp)) },
-                    label = state.email
+                Spacer(modifier = Modifier.height(14.dp))
+
+                ProfileInfoRow(
+                    label = "Phone Number",
+                    value = state.phoneNumber.ifEmpty { "Not specified" },
+                    icon = { PhoneCallVectorIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp)) }
                 )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = BhpScreenBg)
 
-                ProfileDetailRow(
-                    icon = { DashboardTruckIcon(tint = BhpDriverBlue, modifier = Modifier.size(16.dp)) },
-                    label = "Assigned Lorry: ${state.assignedLorryRegistration} (${state.assignedLorryMakeModel})"
+                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFF1F5F9))
+
+                ProfileInfoRow(
+                    label = "Email Address",
+                    value = state.email.ifEmpty { "driver@bhp-logistics.com" },
+                    icon = { DocumentTextIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp)) }
                 )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = BhpScreenBg)
 
-                ProfileDetailRow(
-                    icon = { CheckSquareIcon(tint = BhpDriverBlue, modifier = Modifier.size(16.dp)) },
-                    label = "License: ${state.licenseNumber}"
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = BhpScreenBg)
+                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFF1F5F9))
 
-                ProfileDetailRow(
-                    icon = { CalendarIcon(tint = BhpDriverBlue, modifier = Modifier.size(16.dp)) },
-                    label = "Joined On: ${state.joinedOn}"
+                ProfileInfoRow(
+                    label = "Driving License",
+                    value = state.licenseNumber.ifEmpty { "DL Verified" },
+                    icon = { CheckSquareIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp)) }
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // 3. Settings & Actions Card
+        // 3. Assigned Fleet Vehicle Card
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .border(1.dp, BhpCardBorder, RoundedCornerShape(16.dp))
+                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
         ) {
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                ProfileSettingRow(
-                    icon = { LockVectorIcon(tint = BhpTextPrimary, modifier = Modifier.size(18.dp)) },
-                    label = "Change Password",
+            Column(modifier = Modifier.padding(18.dp)) {
+                Text(
+                    text = "Assigned Vehicle",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Color(0xFF0F172A)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                ProfileInfoRow(
+                    label = "Lorry Registration",
+                    value = state.assignedLorryRegistration.ifEmpty { "Unassigned" },
+                    icon = { DashboardTruckIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp)) }
+                )
+
+                if (state.assignedLorryMakeModel.isNotBlank()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFF1F5F9))
+
+                    ProfileInfoRow(
+                        label = "Vehicle Model",
+                        value = state.assignedLorryMakeModel,
+                        icon = { DashboardTruckIcon(tint = Color(0xFF64748B), modifier = Modifier.size(16.dp)) }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 4. Security & Account Actions
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                ProfileClickableRow(
+                    title = "Change Password",
+                    icon = { LockVectorIcon(tint = Color(0xFF0F172A), modifier = Modifier.size(18.dp)) },
                     onClick = onChangePassword
                 )
-                HorizontalDivider(color = BhpScreenBg)
 
-                ProfileSettingRow(
-                    icon = { GlobeVectorIcon(tint = BhpTextPrimary, modifier = Modifier.size(18.dp)) },
-                    label = "Language",
-                    trailingText = "English",
-                    onClick = {}
-                )
-                HorizontalDivider(color = BhpScreenBg)
+                HorizontalDivider(color = Color(0xFFF1F5F9))
 
-                ProfileSettingRow(
-                    icon = { HelpQuestionVectorIcon(tint = BhpTextPrimary, modifier = Modifier.size(18.dp)) },
-                    label = "Help & Support",
+                ProfileClickableRow(
+                    title = "Dispatch Support & Help",
+                    icon = { HelpQuestionVectorIcon(tint = Color(0xFF0F172A), modifier = Modifier.size(18.dp)) },
                     onClick = { showHelpDialog = true }
                 )
-                HorizontalDivider(color = BhpScreenBg)
+
+                HorizontalDivider(color = Color(0xFFF1F5F9))
 
                 // Logout Action Row (Red)
                 Row(
@@ -210,13 +265,13 @@ fun DriverProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showLogoutDialog = true }
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .padding(horizontal = 18.dp, vertical = 14.dp)
                 ) {
-                    LogoutVectorIcon(tint = BhpErrorRed, modifier = Modifier.size(18.dp))
+                    LogoutVectorIcon(tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(14.dp))
                     Text(
-                        text = "Logout",
-                        color = BhpErrorRed,
+                        text = "End Shift & Logout",
+                        color = Color(0xFFDC2626),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
@@ -224,7 +279,7 @@ fun DriverProfileScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
     }
 
     // Logout Confirmation Dialog
@@ -235,22 +290,22 @@ fun DriverProfileScreen(
                 Text(
                     text = "End Shift & Logout?",
                     fontWeight = FontWeight.Bold,
-                    color = BhpTextPrimary
+                    color = Color(0xFF0F172A)
                 )
             },
             text = {
                 Text(
                     text = "Are you sure you want to end your driver shift and sign out of BHP Logistics?",
-                    color = BhpTextSecondary,
-                    fontSize = 13.sp
+                    color = Color(0xFF475569),
+                    fontSize = 13.5.sp
                 )
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = { showLogoutDialog = false },
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Cancel", color = BhpTextSecondary)
+                    Text("Cancel", color = Color(0xFF475569))
                 }
             },
             confirmButton = {
@@ -259,10 +314,10 @@ fun DriverProfileScreen(
                         showLogoutDialog = false
                         onLogout()
                     },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BhpErrorRed)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
                 ) {
-                    Text("Logout", color = Color.White)
+                    Text("Logout", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -272,18 +327,25 @@ fun DriverProfileScreen(
     if (showHelpDialog) {
         AlertDialog(
             onDismissRequest = { showHelpDialog = false },
-            title = { Text("Driver Support", fontWeight = FontWeight.Bold) },
+            title = {
+                Text(
+                    text = "Driver Support Desk",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+            },
             text = {
                 Text(
-                    text = "For emergency road assistance or route support, please contact the central dispatch team at support@bhp-logistics.com or call toll-free 1800-BHP-HELP.",
-                    fontSize = 13.sp,
-                    color = BhpTextSecondary
+                    text = "For emergency breakdown assistance or route coordination, contact the central dispatch team at support@bhp-logistics.com or call toll-free +91 94400 12345.",
+                    fontSize = 13.5.sp,
+                    color = Color(0xFF475569)
                 )
             },
             confirmButton = {
                 Button(
                     onClick = { showHelpDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = BhpDriverBlue)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A)),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Close", color = Color.White)
                 }
@@ -293,9 +355,10 @@ fun DriverProfileScreen(
 }
 
 @Composable
-private fun ProfileDetailRow(
-    icon: @Composable () -> Unit,
-    label: String
+private fun ProfileInfoRow(
+    label: String,
+    value: String,
+    icon: @Composable () -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -303,20 +366,27 @@ private fun ProfileDetailRow(
     ) {
         icon()
         Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            color = BhpTextPrimary,
-            fontWeight = FontWeight.Medium
-        )
+        Column {
+            Text(
+                text = label,
+                fontSize = 11.5.sp,
+                color = Color(0xFF64748B),
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = value,
+                fontSize = 14.sp,
+                color = Color(0xFF0F172A),
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 
 @Composable
-private fun ProfileSettingRow(
+private fun ProfileClickableRow(
+    title: String,
     icon: @Composable () -> Unit,
-    label: String,
-    trailingText: String? = null,
     onClick: () -> Unit
 ) {
     Row(
@@ -325,29 +395,19 @@ private fun ProfileSettingRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = 18.dp, vertical = 14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             icon()
             Spacer(modifier = Modifier.width(14.dp))
             Text(
-                text = label,
+                text = title,
                 fontSize = 14.sp,
-                color = BhpTextPrimary,
+                color = Color(0xFF0F172A),
                 fontWeight = FontWeight.Medium
             )
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (trailingText != null) {
-                Text(
-                    text = trailingText,
-                    fontSize = 13.sp,
-                    color = BhpTextSecondary
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-            ChevronRightIcon(tint = BhpTextSecondary, modifier = Modifier.size(16.dp))
-        }
+        ChevronRightIcon(tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
     }
 }

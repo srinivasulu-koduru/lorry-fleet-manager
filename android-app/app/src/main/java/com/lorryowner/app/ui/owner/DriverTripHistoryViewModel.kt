@@ -294,4 +294,46 @@ class DriverTripHistoryViewModel(
 
         return Result.failure(lastException ?: Exception("Could not connect to fleet server."))
     }
+
+    fun cancelTrip(tripId: Long, onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            val token = sessionManager?.getAccessToken()
+            if (token == null) {
+                onResult(false, "Authentication token missing")
+                return@launch
+            }
+            val endpointUrl = ApiConfig.buildUrl("/api/owner/trips/$tripId/cancel", sessionManager)
+            val result = withContext(Dispatchers.IO) {
+                var connection: HttpURLConnection? = null
+                try {
+                    val url = URL(endpointUrl)
+                    connection = (url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        connectTimeout = CONNECT_TIMEOUT_MS
+                        readTimeout = READ_TIMEOUT_MS
+                        setRequestProperty("Accept", "application/json")
+                        setRequestProperty("Authorization", "Bearer $token")
+                    }
+                    if (connection.responseCode in 200..299) {
+                        Result.success(Unit)
+                    } else {
+                        val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "Cancellation failed"
+                        Result.failure(Exception("Failed to cancel trip: HTTP ${connection.responseCode} $err"))
+                    }
+                } catch (e: Exception) {
+                    Result.failure(e)
+                } finally {
+                    connection?.disconnect()
+                }
+            }
+
+            if (result.isSuccess) {
+                loadData()
+                onResult(true, "Trip cancelled successfully")
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Cancellation failed"
+                onResult(false, errorMsg)
+            }
+        }
+    }
 }

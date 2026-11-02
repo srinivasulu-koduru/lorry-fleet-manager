@@ -6,6 +6,7 @@ package com.lorryowner.backend.entity;
  */
 public enum OperationalStatus {
     AVAILABLE,
+    LOADING,
     ON_TRIP,
     MAINTENANCE,
     UNAVAILABLE

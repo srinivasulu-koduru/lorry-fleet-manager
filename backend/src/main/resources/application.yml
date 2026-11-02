@@ -37,6 +37,15 @@ spring:
         format_sql: false
         show_sql: false
 
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 50MB
+
+app:
+  document:
+    upload-dir: ${DOCUMENT_UPLOAD_DIR:uploads/documents}
+
 # Spring Boot Actuator configuration
 management:
   endpoints:

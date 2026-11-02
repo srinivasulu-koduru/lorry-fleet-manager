@@ -1,5 +1,7 @@
 package com.lorryowner.app.ui.owner
 
+import com.google.android.gms.maps.model.LatLng
+import com.lorryowner.app.network.OsrmRoutingService
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -123,5 +125,105 @@ class LiveTrackingModelTest {
         assertEquals(285.0, result.remainingDistanceKm, 0.01)
         assertEquals("4h 55m", result.estimatedDrivingTime)
         assertEquals("04:30 AM", result.estimatedArrival)
+    }
+
+    @Test
+    fun testHaversineDistanceCalculation() {
+        // Hyderabad to Bengaluru approximate straight line distance (~500 km)
+        val distMeters = OsrmRoutingService.haversineDistanceMeters(
+            17.3850, 78.4867,
+            12.9716, 77.5946
+        )
+        val distKm = distMeters / 1000.0
+        assertTrue("Distance should be around 500km, got: $distKm", distKm in 480.0..520.0)
+    }
+
+    @Test
+    fun testRouteDeviationDetection_onRoute_notDeviated() {
+        val plannedRoute = listOf(
+            LatLng(17.3850, 78.4867),
+            LatLng(16.7488, 77.9942),
+            LatLng(15.8281, 78.0373),
+            LatLng(12.9716, 77.5946)
+        )
+
+        // Point directly along the segment between 17.3850, 78.4867 and 16.7488, 77.9942
+        val onRoutePoint = LatLng(17.0669, 78.2404)
+        val distanceMeters = OsrmRoutingService.calculateMinDistanceToRoute(onRoutePoint, plannedRoute)
+
+        assertTrue("Distance to route should be minimal (< 200m), got: $distanceMeters", distanceMeters < 200.0)
+        assertFalse("Should not be flagged as deviated", distanceMeters > OsrmRoutingService.DEFAULT_DEVIATION_THRESHOLD_METERS)
+    }
+
+    @Test
+    fun testRouteDeviationDetection_offRoute_isDeviated() {
+        val plannedRoute = listOf(
+            LatLng(17.3850, 78.4867),
+            LatLng(16.7488, 77.9942),
+            LatLng(15.8281, 78.0373),
+            LatLng(12.9716, 77.5946)
+        )
+
+        // Point far off to the east (e.g. Vijayawada ~250km away)
+        val farOffPoint = LatLng(16.5062, 80.6480)
+        val distanceMeters = OsrmRoutingService.calculateMinDistanceToRoute(farOffPoint, plannedRoute)
+
+        assertTrue("Distance should be > 50km, got: $distanceMeters", distanceMeters > 50000.0)
+        assertTrue("Should be flagged as deviated", distanceMeters > OsrmRoutingService.DEFAULT_DEVIATION_THRESHOLD_METERS)
+    }
+
+    @Test
+    fun testBuildCleanTravelledSegments_stationaryJitter_eliminated() {
+        // Stationary indoor jitter points (identical to Trip #12 in Anantapur compound)
+        val stationaryJitterPoints = listOf(
+            OsrmRoutingService.PathPoint(14.7457146, 77.6896903, null),
+            OsrmRoutingService.PathPoint(14.7456567, 77.6897235, 4.33),
+            OsrmRoutingService.PathPoint(14.7456061, 77.6896708, null),
+            OsrmRoutingService.PathPoint(14.7456826, 77.6897041, null),
+            OsrmRoutingService.PathPoint(14.7456566, 77.6897127, null),
+            OsrmRoutingService.PathPoint(14.7456393, 77.6896961, null),
+            OsrmRoutingService.PathPoint(14.7455942, 77.6897667, null),
+            OsrmRoutingService.PathPoint(14.7457495, 77.6896596, null),
+            OsrmRoutingService.PathPoint(14.7456108, 77.6897447, null),
+            OsrmRoutingService.PathPoint(14.7457908, 77.6896602, null),
+            OsrmRoutingService.PathPoint(14.7456374, 77.6897225, null),
+            OsrmRoutingService.PathPoint(14.7456666, 77.6897055, null),
+            OsrmRoutingService.PathPoint(14.7455589, 77.6897166, null),
+            OsrmRoutingService.PathPoint(14.7457125, 77.6897003, null),
+            OsrmRoutingService.PathPoint(14.7457124, 77.6896503, 3.07),
+            OsrmRoutingService.PathPoint(14.7456254, 77.6896718, 0.32),
+            OsrmRoutingService.PathPoint(14.7456489, 77.6897286, null),
+            OsrmRoutingService.PathPoint(14.7456973, 77.6896665, null),
+            OsrmRoutingService.PathPoint(14.7455581, 77.6896620, null),
+            OsrmRoutingService.PathPoint(14.7457415, 77.6895522, null),
+            OsrmRoutingService.PathPoint(14.7456532, 77.6896739, null),
+            OsrmRoutingService.PathPoint(14.7456323, 77.6897162, null),
+            OsrmRoutingService.PathPoint(14.7456446, 77.6897182, null),
+            OsrmRoutingService.PathPoint(14.7456243, 77.6897148, null),
+            OsrmRoutingService.PathPoint(14.7456872, 77.6896747, null),
+            OsrmRoutingService.PathPoint(14.7455921, 77.6897750, null),
+            OsrmRoutingService.PathPoint(14.7456029, 77.6897373, null),
+            OsrmRoutingService.PathPoint(14.7456167, 77.6897572, 0.41)
+        )
+
+        val cleanSegments = OsrmRoutingService.buildCleanTravelledSegments(stationaryJitterPoints)
+        // All points are within 17.7m of each other: should produce 0 segments (no green zigzags)
+        assertTrue("Stationary jitter should produce 0 segments, got: ${cleanSegments.size}", cleanSegments.isEmpty())
+    }
+
+    @Test
+    fun testBuildCleanTravelledSegments_genuineHighwayDriving_retained() {
+        // Genuine highway driving along NH 44 (points ~60-70m apart, moving south)
+        val highwayPoints = listOf(
+            OsrmRoutingService.PathPoint(14.7455, 77.6898, 45.0),
+            OsrmRoutingService.PathPoint(14.7449, 77.6898, 48.0),
+            OsrmRoutingService.PathPoint(14.7443, 77.6898, 52.0),
+            OsrmRoutingService.PathPoint(14.7437, 77.6898, 50.0),
+            OsrmRoutingService.PathPoint(14.7431, 77.6898, 55.0)
+        )
+
+        val cleanSegments = OsrmRoutingService.buildCleanTravelledSegments(highwayPoints)
+        assertEquals("Should retain 1 continuous highway driving segment", 1, cleanSegments.size)
+        assertEquals("Should contain all 5 driving points", 5, cleanSegments[0].size)
     }
 }

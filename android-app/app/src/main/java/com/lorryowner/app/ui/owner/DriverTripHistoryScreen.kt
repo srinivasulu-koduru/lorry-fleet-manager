@@ -43,6 +43,7 @@ fun DriverTripHistoryScreen(
         DriverTripHistoryViewModel(driverId, driverName, driverUsername, effectiveSession)
     }
     val state = viewModel.uiState
+    var tripToCancel by remember { mutableStateOf<TripItemUiState?>(null) }
 
     Scaffold(
         topBar = {
@@ -229,7 +230,8 @@ fun DriverTripHistoryScreen(
                 items(state.trips, key = { it.id }) { trip ->
                     TripCard(
                         trip = trip,
-                        onViewDetails = { viewModel.showTripDetails(trip) }
+                        onViewDetails = { viewModel.showTripDetails(trip) },
+                        onCancelTrip = { tripToCancel = trip }
                     )
                 }
 
@@ -244,7 +246,64 @@ fun DriverTripHistoryScreen(
     if (state.selectedTripForDetails != null) {
         TripDetailsDialog(
             trip = state.selectedTripForDetails,
-            onDismiss = { viewModel.dismissTripDetails() }
+            onDismiss = { viewModel.dismissTripDetails() },
+            onCancelClick = {
+                val current = state.selectedTripForDetails
+                viewModel.dismissTripDetails()
+                tripToCancel = current
+            }
+        )
+    }
+
+    // Cancel Trip Confirmation Dialog
+    if (tripToCancel != null) {
+        val trip = tripToCancel!!
+        AlertDialog(
+            onDismissRequest = { tripToCancel = null },
+            containerColor = Color.White,
+            titleContentColor = BhpTextPrimary,
+            textContentColor = BhpTextPrimary,
+            title = {
+                Text("Cancel Trip", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = BhpTextPrimary)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Are you sure you want to cancel this planned trip?",
+                        color = BhpTextPrimary,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Trip: #${trip.tripReference} (${trip.originLocation} → ${trip.destinationLocation})",
+                        color = BhpTextSecondary,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        text = "This action will permanently set the trip status to Cancelled.",
+                        color = BhpErrorRed,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val idToCancel = trip.id
+                        tripToCancel = null
+                        viewModel.cancelTrip(idToCancel)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BhpErrorRed)
+                ) {
+                    Text("Yes, Cancel Trip", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { tripToCancel = null }) {
+                    Text("Keep Trip", color = BhpTextSecondary)
+                }
+            }
         )
     }
 }
@@ -508,7 +567,8 @@ private fun TripFilterChip(
 @Composable
 private fun TripCard(
     trip: TripItemUiState,
-    onViewDetails: () -> Unit
+    onViewDetails: () -> Unit,
+    onCancelTrip: ((TripItemUiState) -> Unit)? = null
 ) {
     Surface(
         color = BhpCardWhite,
@@ -605,18 +665,40 @@ private fun TripCard(
                     )
                 )
 
-                TextButton(
-                    onClick = onViewDetails,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "View Details",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = BhpDriverBlue,
-                            fontSize = 11.5.sp
+                    if (trip.tripStatus.equals("PLANNED", ignoreCase = true) && onCancelTrip != null) {
+                        OutlinedButton(
+                            onClick = { onCancelTrip(trip) },
+                            border = BorderStroke(1.dp, BhpErrorRed),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "✕ Cancel",
+                                color = BhpErrorRed,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    TextButton(
+                        onClick = onViewDetails,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "View Details",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = BhpDriverBlue,
+                                fontSize = 11.5.sp
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
@@ -629,6 +711,7 @@ private fun TripStatusBadge(status: String) {
         "COMPLETED" -> Triple(Color(0xFFDCFCE7), Color(0xFF15803D), "Completed")
         "IN_PROGRESS" -> Triple(Color(0xFFDBEAFE), Color(0xFF1D4ED8), "In Progress")
         "CANCELLED" -> Triple(Color(0xFFFEE2E2), Color(0xFFB91C1C), "Cancelled")
+        "PLANNED" -> Triple(Color(0xFFFEF3C7), Color(0xFFB45309), "Planned")
         else -> Triple(Color(0xFFFEF3C7), Color(0xFFB45309), status)
     }
 
@@ -651,24 +734,32 @@ private fun TripStatusBadge(status: String) {
 @Composable
 fun TripDetailsDialog(
     trip: TripItemUiState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onCancelClick: (() -> Unit)? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = BhpCardWhite,
+        containerColor = Color.White,
         titleContentColor = BhpTextPrimary,
         textContentColor = BhpTextPrimary,
         title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TripRouteIcon(tint = BhpDriverBlue, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Trip Details",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = BhpTextPrimary
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TripRouteIcon(tint = BhpDriverBlue, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Trip Details",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = BhpTextPrimary
+                        )
                     )
-                )
+                }
+                TripStatusBadge(status = trip.tripStatus)
             }
         },
         text = {
@@ -693,8 +784,21 @@ fun TripDetailsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close", fontWeight = FontWeight.Bold, color = BhpDriverBlue)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (trip.tripStatus.equals("PLANNED", ignoreCase = true) && onCancelClick != null) {
+                    OutlinedButton(
+                        onClick = onCancelClick,
+                        border = BorderStroke(1.dp, BhpErrorRed)
+                    ) {
+                        Text("Cancel Trip", color = BhpErrorRed, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = BhpDarkForestGreen)
+                ) {
+                    Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         }
     )

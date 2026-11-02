@@ -5,7 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.maps.model.LatLng
 import com.lorryowner.app.network.ApiConfig
+import com.lorryowner.app.network.CityCoordinateResolver
+import com.lorryowner.app.network.OsrmRoutingService
 import com.lorryowner.app.security.SessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,14 +67,15 @@ class LiveTrackingViewModel(
             val result = withContext(Dispatchers.IO) {
                 fetchTrackingFromNetwork()
             }
-            uiState = if (result.isSuccess) {
-                uiState.copy(
+            if (result.isSuccess) {
+                val enrichedData = attachRoadRouteAndDeviation(result.getOrThrow())
+                uiState = uiState.copy(
                     isLoading = false,
-                    trackingData = result.getOrThrow(),
+                    trackingData = enrichedData,
                     errorMessage = null
                 )
             } else {
-                uiState.copy(
+                uiState = uiState.copy(
                     isLoading = false,
                     errorMessage = result.exceptionOrNull()?.message ?: "Failed to load live tracking details"
                 )
@@ -84,11 +88,105 @@ class LiveTrackingViewModel(
             fetchTrackingFromNetwork()
         }
         if (result.isSuccess) {
+            val enrichedData = attachRoadRouteAndDeviation(result.getOrThrow())
             uiState = uiState.copy(
-                trackingData = result.getOrThrow(),
+                trackingData = enrichedData,
                 errorMessage = null
             )
         }
+    }
+
+    private var lastRouteQueryLat: Double? = null
+    private var lastRouteQueryLon: Double? = null
+    private var cachedRoadRoute: List<LatLng> = emptyList()
+
+    private suspend fun attachRoadRouteAndDeviation(parsed: LiveTrackingLorryUiState): LiveTrackingLorryUiState {
+        // Resolve destination coordinates safely:
+        // If destinationLocation is a known city in CityCoordinateResolver, use its authoritative coordinate;
+        // Also if backend sent default Hyderabad (17.3850, 78.4867) while destinationLocation is NOT Hyderabad, override it!
+        val resolvedDest = CityCoordinateResolver.resolveCityCoordinates(parsed.destinationLocation)
+        val isDestKnown = CityCoordinateResolver.findInLookupTable(parsed.destinationLocation) != null
+        val backendDestIsDefaultHyd = parsed.destinationLatitude != null &&
+                kotlin.math.abs(parsed.destinationLatitude - 17.3850) < 0.01 &&
+                kotlin.math.abs((parsed.destinationLongitude ?: 0.0) - 78.4867) < 0.01 &&
+                !parsed.destinationLocation.lowercase().contains("hyderabad")
+
+        val destLat = if (isDestKnown || backendDestIsDefaultHyd) resolvedDest.latitude else (parsed.destinationLatitude ?: resolvedDest.latitude)
+        val destLon = if (isDestKnown || backendDestIsDefaultHyd) resolvedDest.longitude else (parsed.destinationLongitude ?: resolvedDest.longitude)
+
+        // Resolve origin coordinates safely
+        val resolvedOrigin = CityCoordinateResolver.resolveCityCoordinates(parsed.originLocation)
+        val isOriginKnown = CityCoordinateResolver.findInLookupTable(parsed.originLocation) != null
+        val backendOriginIsDefaultHyd = parsed.originLatitude != null &&
+                kotlin.math.abs(parsed.originLatitude - 17.3850) < 0.01 &&
+                kotlin.math.abs((parsed.originLongitude ?: 0.0) - 78.4867) < 0.01 &&
+                !parsed.originLocation.lowercase().contains("hyderabad")
+
+        val originLat = if (isOriginKnown || backendOriginIsDefaultHyd) resolvedOrigin.latitude else (parsed.originLatitude ?: resolvedOrigin.latitude)
+        val originLon = if (isOriginKnown || backendOriginIsDefaultHyd) resolvedOrigin.longitude else (parsed.originLongitude ?: resolvedOrigin.longitude)
+
+        // Start position: prefer live truck position (or fallback to origin)
+        val truckLat = parsed.latitude
+        val truckLon = parsed.longitude
+        val startLat = truckLat ?: originLat
+        val startLon = truckLon ?: originLon
+
+        val finalRoute = if (destLat != null && destLon != null && startLat != null && startLon != null) {
+            val lastLat = lastRouteQueryLat
+            val lastLon = lastRouteQueryLon
+            val isNearby = lastLat != null && lastLon != null &&
+                    OsrmRoutingService.haversineDistanceMeters(lastLat, lastLon, startLat, startLon) < 150.0
+
+            if (isNearby && cachedRoadRoute.isNotEmpty()) {
+                cachedRoadRoute
+            } else {
+                val routeRes = withContext(Dispatchers.IO) {
+                    OsrmRoutingService.fetchRouteFromOsrm(
+                        originLat = startLat,
+                        originLon = startLon,
+                        destLat = destLat,
+                        destLon = destLon
+                    )
+                }
+                if (routeRes.isSuccess) {
+                    val pts = routeRes.getOrThrow().points
+                    if (pts.isNotEmpty()) {
+                        cachedRoadRoute = pts
+                        lastRouteQueryLat = startLat
+                        lastRouteQueryLon = startLon
+                        pts
+                    } else cachedRoadRoute
+                } else {
+                    cachedRoadRoute
+                }
+            }
+        } else {
+            emptyList()
+        }
+
+        val (isDeviated, devDistKm) = if (finalRoute.isNotEmpty() && truckLat != null && truckLon != null) {
+            val accuracy = parsed.accuracyMeters ?: 50.0
+            if (accuracy <= 150.0) {
+                val truckPoint = LatLng(truckLat, truckLon)
+                val distMeters = OsrmRoutingService.calculateMinDistanceToRoute(truckPoint, finalRoute)
+                val isDev = distMeters > OsrmRoutingService.DEFAULT_DEVIATION_THRESHOLD_METERS
+                Pair(isDev, distMeters / 1000.0)
+            } else {
+                Pair(false, 0.0)
+            }
+        } else {
+            Pair(false, 0.0)
+        }
+
+        return parsed.copy(
+            plannedRoadRoute = finalRoute,
+            originLatitude = originLat,
+            originLongitude = originLon,
+            destinationLatitude = destLat,
+            destinationLongitude = destLon,
+            isRouteDeviated = isDeviated,
+            deviationDistanceKm = devDistKm
+        )
     }
 
     private fun fetchTrackingFromNetwork(): Result<LiveTrackingLorryUiState> {

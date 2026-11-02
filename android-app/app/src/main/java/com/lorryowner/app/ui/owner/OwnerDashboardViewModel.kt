@@ -30,9 +30,14 @@ data class FleetOverviewState(
 data class FinancialSummaryState(
     val monthLabel: String = "This month",
     val isSample: Boolean = true,
-    val income: String = "₹3,89,500",
-    val expenses: String = "₹2,58,000",
-    val profit: String = "₹1,31,500"
+    val totalTrips: String = "48",
+    val totalTripsTrend: String = "↑ 12%",
+    val income: String = "₹2,45,000",
+    val incomeTrend: String = "↑ 15%",
+    val expenses: String = "₹1,75,000",
+    val expensesTrend: String = "↑ 8%",
+    val profit: String = "₹70,000",
+    val profitTrend: String = "↑ 18%"
 )
 
 data class ActivityItemState(
@@ -201,9 +206,10 @@ class OwnerDashboardViewModel(
                 val finObj = json.optJSONObject("financialSummary")
                 val monthLabel = finObj?.optString("monthLabel", "This month") ?: "This month"
                 val isSample = finObj?.optBoolean("isSample", true) ?: true
-                val incomeVal = finObj?.optDouble("income", 389500.0) ?: 389500.0
-                val expenseVal = finObj?.optDouble("expenses", 258000.0) ?: 258000.0
-                val profitVal = finObj?.optDouble("profit", 131500.0) ?: 131500.0
+                val incomeVal = finObj?.optDouble("income", 245000.0) ?: 245000.0
+                val expenseVal = finObj?.optDouble("expenses", 175000.0) ?: 175000.0
+                val profitVal = finObj?.optDouble("profit", 70000.0) ?: 70000.0
+                val totalTripsVal = finObj?.optLong("totalTrips", 48L) ?: 48L
 
                 // Recent activities
                 val activitiesList = mutableListOf<ActivityItemState>()
@@ -235,9 +241,14 @@ class OwnerDashboardViewModel(
                     financialSummary = FinancialSummaryState(
                         monthLabel = monthLabel,
                         isSample = isSample,
+                        totalTrips = "$totalTripsVal",
+                        totalTripsTrend = "↑ 12%",
                         income = formatCurrency(incomeVal),
+                        incomeTrend = "↑ 15%",
                         expenses = formatCurrency(expenseVal),
-                        profit = formatCurrency(profitVal)
+                        expensesTrend = "↑ 8%",
+                        profit = formatCurrency(profitVal),
+                        profitTrend = "↑ 18%"
                     ),
                     recentActivities = activitiesList
                 )

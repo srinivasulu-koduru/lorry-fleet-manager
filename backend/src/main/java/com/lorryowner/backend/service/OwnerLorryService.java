@@ -59,6 +59,12 @@ public class OwnerLorryService {
 
         long totalLorries = lorryRepository.countByOwner(owner);
         long runningLorries = lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.ON_TRIP);
+        long loadingLorries = lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.LOADING);
+        long availableLorries = lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.AVAILABLE);
+        long notReadyLorries = lorryRepository.countByOwnerAndOperationalStatusIn(
+                owner,
+                List.of(OperationalStatus.MAINTENANCE, OperationalStatus.UNAVAILABLE)
+        );
         long notRunningLorries = Math.max(0, totalLorries - runningLorries);
 
         double runningPercentage = totalLorries > 0
@@ -67,6 +73,18 @@ public class OwnerLorryService {
                 : 0.0;
         double notRunningPercentage = totalLorries > 0
                 ? BigDecimal.valueOf((notRunningLorries * 100.0) / totalLorries)
+                        .setScale(1, RoundingMode.HALF_UP).doubleValue()
+                : 0.0;
+        double loadingPercentage = totalLorries > 0
+                ? BigDecimal.valueOf((loadingLorries * 100.0) / totalLorries)
+                        .setScale(1, RoundingMode.HALF_UP).doubleValue()
+                : 0.0;
+        double availablePercentage = totalLorries > 0
+                ? BigDecimal.valueOf((availableLorries * 100.0) / totalLorries)
+                        .setScale(1, RoundingMode.HALF_UP).doubleValue()
+                : 0.0;
+        double notReadyPercentage = totalLorries > 0
+                ? BigDecimal.valueOf((notReadyLorries * 100.0) / totalLorries)
                         .setScale(1, RoundingMode.HALF_UP).doubleValue()
                 : 0.0;
 
@@ -82,7 +100,13 @@ public class OwnerLorryService {
                 notRunningPercentage,
                 totalTrips,
                 totalDistanceKm != null ? totalDistanceKm : BigDecimal.ZERO,
-                totalMaintenanceCost != null ? totalMaintenanceCost : BigDecimal.ZERO
+                totalMaintenanceCost != null ? totalMaintenanceCost : BigDecimal.ZERO,
+                loadingLorries,
+                loadingPercentage,
+                availableLorries,
+                availablePercentage,
+                notReadyLorries,
+                notReadyPercentage
         );
     }
 

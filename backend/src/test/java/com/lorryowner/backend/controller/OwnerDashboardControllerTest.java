@@ -84,11 +84,17 @@ class OwnerDashboardControllerTest {
         driverToken = jwtService.generateToken(driver);
 
         // 3. Populate 5 fleet lorries with realistic states
-        lorryRepository.save(new Lorry("AP 31 TC 1234", "Ashok Leyland 2820 HG", new BigDecimal("20.00"), OperationalStatus.ON_TRIP));
-        lorryRepository.save(new Lorry("AP 26 TD 5678", "Ashok Leyland 3520 8x2", new BigDecimal("25.00"), OperationalStatus.UNAVAILABLE));
-        lorryRepository.save(new Lorry("TS 09 UA 9012", "Ashok Leyland 4220 10x2", new BigDecimal("30.00"), OperationalStatus.ON_TRIP));
-        lorryRepository.save(new Lorry("AP 39 TT 3456", "Ashok Leyland 2820 HG", new BigDecimal("20.00"), OperationalStatus.ON_TRIP));
-        lorryRepository.save(new Lorry("AP 26 TE 7890", "Ashok Leyland 1920 4x2", new BigDecimal("14.00"), OperationalStatus.AVAILABLE));
+        saveLorry("AP 31 TC 1234", "Ashok Leyland 2820 HG", "20.00", OperationalStatus.ON_TRIP, owner);
+        saveLorry("AP 26 TD 5678", "Ashok Leyland 3520 8x2", "25.00", OperationalStatus.UNAVAILABLE, owner);
+        saveLorry("TS 09 UA 9012", "Ashok Leyland 4220 10x2", "30.00", OperationalStatus.ON_TRIP, owner);
+        saveLorry("AP 39 TT 3456", "Ashok Leyland 2820 HG", "20.00", OperationalStatus.ON_TRIP, owner);
+        saveLorry("AP 26 TE 7890", "Ashok Leyland 1920 4x2", "14.00", OperationalStatus.AVAILABLE, owner);
+    }
+
+    private void saveLorry(String reg, String model, String capacity, OperationalStatus status, User owner) {
+        Lorry lorry = new Lorry(reg, model, new BigDecimal(capacity), status);
+        lorry.setOwner(owner);
+        lorryRepository.save(lorry);
     }
 
     @Test

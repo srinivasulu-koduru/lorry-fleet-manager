@@ -176,6 +176,36 @@ public class OwnerTripService {
         return mapToResponseDto(trip, null);
     }
 
+    /**
+     * Cancels a planned trip for the authenticated owner.
+     * Only trips in PLANNED status can be cancelled.
+     */
+    public TripResponseDto cancelTrip(Long tripId, String ownerUsername) {
+        User owner = resolveAndValidateOwner(ownerUsername);
+
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Trip not found with ID: " + tripId));
+
+        if (trip.getOwner() != null && !trip.getOwner().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Trip belongs to another fleet owner");
+        }
+
+        if (trip.getTripStatus() != TripStatus.PLANNED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Cannot cancel trip with status: " + trip.getTripStatus() + ". Only PLANNED trips can be cancelled."
+            );
+        }
+
+        trip.setTripStatus(TripStatus.CANCELLED);
+        Trip saved = tripRepository.save(trip);
+
+        log.info("Owner '{}' successfully cancelled planned trip ID={} (ref: {})",
+                ownerUsername, saved.getId(), saved.getTripReference());
+
+        return mapToResponseDto(saved, null);
+    }
+
     private User resolveAndValidateOwner(String username) {
         if (username == null || username.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthenticated user");

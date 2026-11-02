@@ -46,7 +46,9 @@ data class AddLorryUiState(
     val manufacturingYearError: String? = null,
     val isSuccess: Boolean = false,
     val createdLorryId: Long? = null,
-    val createdRegistrationNumber: String? = null
+    val createdRegistrationNumber: String? = null,
+    val stagedDocuments: List<com.lorryowner.app.network.StagedDocument> = emptyList(),
+    val uploadProgressText: String? = null
 )
 
 class AddLorryViewModel(
@@ -209,19 +211,47 @@ class AddLorryViewModel(
         }
     }
 
-    fun submitLorry(onSuccess: (Long) -> Unit) {
+    fun onAddStagedDocument(doc: com.lorryowner.app.network.StagedDocument) {
+        uiState = uiState.copy(stagedDocuments = uiState.stagedDocuments + doc)
+    }
+
+    fun onRemoveStagedDocument(index: Int) {
+        if (index in uiState.stagedDocuments.indices) {
+            val updated = uiState.stagedDocuments.toMutableList().apply { removeAt(index) }
+            uiState = uiState.copy(stagedDocuments = updated)
+        }
+    }
+
+    fun submitLorry(context: android.content.Context? = null, onSuccess: (Long) -> Unit) {
         if (!validateForm()) return
         if (uiState.isSubmitting) return
 
         uiState = uiState.copy(isSubmitting = true, errorMessage = null)
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) { executeCreateLorry() }
-            uiState = uiState.copy(isSubmitting = false)
 
             when {
                 result.isSuccess -> {
                     val createdId = result.getOrThrow()
+                    if (context != null && uiState.stagedDocuments.isNotEmpty()) {
+                        withContext(Dispatchers.IO) {
+                            for ((idx, doc) in uiState.stagedDocuments.withIndex()) {
+                                uiState = uiState.copy(uploadProgressText = "Uploading document ${idx + 1}/${uiState.stagedDocuments.size}...")
+                                if (doc.uri != null) {
+                                    com.lorryowner.app.network.DocumentApiService.uploadDocument(
+                                        context = context,
+                                        sessionManager = sessionManager,
+                                        endpointPath = "/api/owner/lorries/$createdId/documents",
+                                        documentTitle = doc.title,
+                                        fileUri = doc.uri
+                                    )
+                                }
+                            }
+                        }
+                    }
                     uiState = uiState.copy(
+                        isSubmitting = false,
+                        uploadProgressText = null,
                         isSuccess = true,
                         createdLorryId = createdId,
                         createdRegistrationNumber = uiState.registrationNumber.trim()
@@ -229,6 +259,7 @@ class AddLorryViewModel(
                     onSuccess(createdId)
                 }
                 else -> {
+                    uiState = uiState.copy(isSubmitting = false, uploadProgressText = null)
                     val rawError = result.exceptionOrNull()?.message ?: "Failed to register lorry. Please try again."
                     if (rawError.contains("already registered", ignoreCase = true) ||
                         rawError.contains("already exists", ignoreCase = true)) {

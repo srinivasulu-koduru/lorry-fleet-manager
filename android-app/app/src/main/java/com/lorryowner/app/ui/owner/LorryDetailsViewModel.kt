@@ -38,7 +38,10 @@ data class LorryDetailsUiState(
     val totalMaintenanceCost: Double = 0.0,
     val selectedTripFilter: String = "ALL",
     val selectedTripForDetails: TripItemUiState? = null,
-    val selectedMaintenanceForDetails: MaintenanceItemUiState? = null
+    val selectedMaintenanceForDetails: MaintenanceItemUiState? = null,
+    val vehicleDocuments: List<com.lorryowner.app.network.DocumentUiItem> = emptyList(),
+    val isUploadingDocument: Boolean = false,
+    val documentError: String? = null
 )
 
 class LorryDetailsViewModel(
@@ -66,9 +69,57 @@ class LorryDetailsViewModel(
                 fetchLorryDetails()
                 fetchTrips()
                 fetchMaintenance()
+                fetchVehicleDocuments()
             }
             uiState = uiState.copy(isLoading = false)
             applyTripFilter(uiState.selectedTripFilter)
+        }
+    }
+
+    fun fetchVehicleDocuments() {
+        val result = com.lorryowner.app.network.DocumentApiService.fetchDocuments(
+            sessionManager = sessionManager,
+            endpointPath = "/api/owner/lorries/$lorryId/documents"
+        )
+        if (result.isSuccess) {
+            uiState = uiState.copy(vehicleDocuments = result.getOrDefault(emptyList()))
+        }
+    }
+
+    fun uploadVehicleDocument(context: android.content.Context, title: String, uri: android.net.Uri) {
+        viewModelScope.launch {
+            uiState = uiState.copy(isUploadingDocument = true, documentError = null)
+            val result = withContext(Dispatchers.IO) {
+                com.lorryowner.app.network.DocumentApiService.uploadDocument(
+                    context = context,
+                    sessionManager = sessionManager,
+                    endpointPath = "/api/owner/lorries/$lorryId/documents",
+                    documentTitle = title,
+                    fileUri = uri
+                )
+            }
+            uiState = uiState.copy(isUploadingDocument = false)
+            if (result.isSuccess) {
+                fetchVehicleDocuments()
+            } else {
+                uiState = uiState.copy(documentError = result.exceptionOrNull()?.message ?: "Upload failed")
+            }
+        }
+    }
+
+    fun deleteVehicleDocument(docId: Long) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                com.lorryowner.app.network.DocumentApiService.deleteDocument(
+                    sessionManager = sessionManager,
+                    endpointPath = "/api/owner/lorries/$lorryId/documents/$docId"
+                )
+            }
+            if (result.isSuccess) {
+                fetchVehicleDocuments()
+            } else {
+                uiState = uiState.copy(documentError = result.exceptionOrNull()?.message ?: "Delete failed")
+            }
         }
     }
 
@@ -88,6 +139,48 @@ class LorryDetailsViewModel(
 
     fun selectMaintenanceForDetails(item: MaintenanceItemUiState?) {
         uiState = uiState.copy(selectedMaintenanceForDetails = item)
+    }
+
+    fun cancelTrip(tripId: Long, onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            val token = sessionManager?.getAccessToken()
+            if (token == null) {
+                onResult(false, "Authentication token missing")
+                return@launch
+            }
+            val endpointUrl = ApiConfig.buildUrl("/api/owner/trips/$tripId/cancel", sessionManager)
+            val result = withContext(Dispatchers.IO) {
+                var connection: HttpURLConnection? = null
+                try {
+                    val url = URL(endpointUrl)
+                    connection = (url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        connectTimeout = CONNECT_TIMEOUT_MS
+                        readTimeout = READ_TIMEOUT_MS
+                        setRequestProperty("Accept", "application/json")
+                        setRequestProperty("Authorization", "Bearer $token")
+                    }
+                    if (connection.responseCode in 200..299) {
+                        Result.success(Unit)
+                    } else {
+                        val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "Cancellation failed"
+                        Result.failure(Exception("Failed to cancel trip: HTTP ${connection.responseCode} $err"))
+                    }
+                } catch (e: Exception) {
+                    Result.failure(e)
+                } finally {
+                    connection?.disconnect()
+                }
+            }
+
+            if (result.isSuccess) {
+                loadData()
+                onResult(true, "Trip cancelled successfully")
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Cancellation failed"
+                onResult(false, errorMsg)
+            }
+        }
     }
 
     private fun fetchLorryDetails() {

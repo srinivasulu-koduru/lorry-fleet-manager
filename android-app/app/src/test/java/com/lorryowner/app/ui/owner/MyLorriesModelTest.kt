@@ -117,4 +117,47 @@ class MyLorriesModelTest {
         assertEquals(1, matched2.size)
         assertEquals(2L, matched2[0].id)
     }
+
+    @Test
+    fun testLoadingAndAvailableFilters() {
+        val lorries = listOf(
+            LorryCardUiState(id = 1L, registrationNumber = "AP 31 TC 1001", makeModel = "Tata Prima", capacityTons = 28.0, running = true, operationalStatus = "ON_TRIP"),
+            LorryCardUiState(id = 2L, registrationNumber = "AP 31 TC 1002", makeModel = "Ashok Leyland", capacityTons = 25.0, running = false, operationalStatus = "LOADING"),
+            LorryCardUiState(id = 3L, registrationNumber = "AP 31 TC 1003", makeModel = "BharatBenz", capacityTons = 30.0, running = false, operationalStatus = "AVAILABLE"),
+            LorryCardUiState(id = 4L, registrationNumber = "AP 31 TC 1004", makeModel = "Mahindra Blazo", capacityTons = 16.0, running = false, operationalStatus = "MAINTENANCE")
+        )
+
+        val loadingLorries = lorries.filter { it.operationalStatus.equals("LOADING", ignoreCase = true) }
+        val availableLorries = lorries.filter { it.operationalStatus.equals("AVAILABLE", ignoreCase = true) }
+
+        assertEquals(1, loadingLorries.size)
+        assertEquals("AP 31 TC 1002", loadingLorries[0].registrationNumber)
+        assertEquals(1, availableLorries.size)
+        assertEquals("AP 31 TC 1003", availableLorries[0].registrationNumber)
+    }
+
+    @Test
+    fun testFleetSummaryUiState_fourSegments() {
+        val summary = FleetSummaryUiState(
+            totalLorries = 10L,
+            runningLorries = 4L,
+            loadingLorries = 2L,
+            availableLorries = 3L,
+            notReadyLorries = 1L,
+            runningPercentage = 40.0,
+            loadingPercentage = 20.0,
+            availablePercentage = 30.0,
+            notReadyPercentage = 10.0
+        )
+
+        assertEquals(10L, summary.totalLorries)
+        assertEquals(4L, summary.runningLorries)
+        assertEquals(2L, summary.loadingLorries)
+        assertEquals(3L, summary.availableLorries)
+        assertEquals(1L, summary.notReadyLorries)
+        assertEquals(40.0, summary.runningPercentage, 0.001)
+        assertEquals(20.0, summary.loadingPercentage, 0.001)
+        assertEquals(30.0, summary.availablePercentage, 0.001)
+        assertEquals(10.0, summary.notReadyPercentage, 0.001)
+    }
 }

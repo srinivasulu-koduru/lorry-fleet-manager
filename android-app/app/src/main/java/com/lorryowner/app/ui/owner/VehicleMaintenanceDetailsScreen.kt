@@ -1,22 +1,33 @@
 package com.lorryowner.app.ui.owner
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.lorryowner.app.R
 import com.lorryowner.app.security.SessionManager
-import com.lorryowner.app.ui.components.CommercialTruckHeaderGraphic
+import com.lorryowner.app.ui.components.ChevronRightIcon
+import com.lorryowner.app.ui.components.CoinsStackIcon
 import com.lorryowner.app.ui.theme.*
 import java.text.NumberFormat
 import java.util.Locale
@@ -35,32 +46,55 @@ fun VehicleMaintenanceDetailsScreen(
     val state = viewModel.uiState
     var selectedRecordForDialog by remember { mutableStateOf<MaintenanceHistoryRecordItem?>(null) }
 
+    // Explicitly reload vehicle maintenance details whenever screen enters composition
+    LaunchedEffect(lorryId) {
+        viewModel.loadDetails()
+    }
+
+    // Lifecycle observer to automatically reload fresh maintenance data on resume
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadDetails()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     Scaffold(
         topBar = {
             Surface(
-                color = BhpNavyDark,
+                color = Color.White,
+                shadowElevation = 2.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 14.dp),
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(40.dp)
+                    ) {
                         Text(
                             text = "←",
-                            color = Color.White,
+                            color = Color(0xFF0F172A),
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Vehicle Maintenance",
+                        text = "Lorry Maintenance",
                         style = MaterialTheme.typography.titleLarge.copy(
-                            color = Color.White,
+                            color = Color(0xFF0F172A),
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
                         )
@@ -71,223 +105,207 @@ fun VehicleMaintenanceDetailsScreen(
         bottomBar = {
             Surface(
                 color = Color.White,
-                shadowElevation = 8.dp,
+                shadowElevation = 10.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Button(
                         onClick = { onAddServiceRecordClick(lorryId) },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF16A34A),
                             contentColor = Color.White
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
+                            .height(52.dp)
                     ) {
-                        Text(
-                            text = "Add Service Record",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "+",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Add Maintenance",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BhpScreenBg)
-                .padding(innerPadding)
-                .padding(16.dp)
+                .background(Color(0xFFF8FAFC))
+                .padding(innerPadding),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Vehicle Info Top Card
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, BhpCardBorder, RoundedCornerShape(16.dp))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // Top: Truck Illustration + Reg + Make
+            // 1. Vehicle Header Card
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CommercialTruckHeaderGraphic(
+                        // Commercial Truck Photo Thumbnail
+                        Image(
+                            painter = painterResource(id = R.drawable.bhp_truck_highway),
+                            contentDescription = "Lorry Image",
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(width = 110.dp, height = 70.dp)
-                                .padding(end = 12.dp)
+                                .size(width = 80.dp, height = 64.dp)
+                                .clip(RoundedCornerShape(12.dp))
                         )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Registration",
-                                fontSize = 11.sp,
-                                color = BhpTextSecondary,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
                                 text = state.registrationNumber.ifEmpty { "Vehicle #$lorryId" },
-                                fontSize = 16.sp,
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = BhpTextPrimary
+                                color = Color(0xFF0F172A)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Make",
-                                fontSize = 11.sp,
-                                color = BhpTextSecondary,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
                                 text = state.makeModel.ifEmpty { "Commercial Lorry" },
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = BhpTextPrimary
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = Color(0xFFF1F5F9))
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Bottom Row inside Card: Last Service | Next Service | Total Cost
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        // Last Service
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Last Service",
-                                fontSize = 11.sp,
-                                color = BhpTextSecondary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = MaintenanceFormattingHelper.formatDisplayDate(state.lastServiceDate),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = BhpTextPrimary
-                            )
-                        }
-
-                        // Next Service
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Next Service",
-                                fontSize = 11.sp,
-                                color = BhpTextSecondary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = MaintenanceFormattingHelper.formatDisplayDate(state.nextServiceDate),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = BhpTextPrimary
-                            )
-                        }
-
-                        // Total Maintenance
-                        Column(
-                            modifier = Modifier.weight(1.2f),
-                            horizontalAlignment = Alignment.End
-                        ) {
-                            Text(
-                                text = "Total Maintenance",
-                                fontSize = 11.sp,
-                                color = BhpTextSecondary
-                            )
-                            Text(
-                                text = "Total Maintenance Cost",
-                                fontSize = 10.sp,
-                                color = BhpTextMuted
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = MaintenanceFormattingHelper.formatIndianRupee(state.totalMaintenanceCost),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E293B)
+                                fontSize = 14.sp,
+                                color = Color(0xFF64748B)
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // 2. Service History Title
-            Text(
-                text = "Service History",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = BhpTextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // 3. Service History Cards List
-            if (state.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 60.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = Color(0xFF16A34A))
-                }
-            } else if (state.records.isEmpty()) {
+            // 2. Total Maintenance Spent Card (Mint Light-Green)
+            item {
                 Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, BhpCardBorder, RoundedCornerShape(14.dp))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5)),
+                    border = BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "No Service History",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = BhpTextPrimary
+                        // Coin Stack Icon
+                        CoinsStackIcon(
+                            tint = Color(0xFF059669),
+                            modifier = Modifier.size(46.dp)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "No maintenance records logged yet for this vehicle.",
-                            fontSize = 13.sp,
-                            color = BhpTextSecondary
-                        )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "TOTAL MAINTENANCE SPENT",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF065F46),
+                                letterSpacing = 0.5.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = MaintenanceFormattingHelper.formatIndianRupee(state.totalMaintenanceCost),
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF065F46)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "All recorded maintenance",
+                                fontSize = 12.sp,
+                                color = Color(0xFF059669)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 3. Section Header: MAINTENANCE HISTORY
+            item {
+                Text(
+                    text = "MAINTENANCE HISTORY",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
+
+            // 4. Maintenance History Records List
+            if (state.isLoading && state.records.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color(0xFF16A34A))
+                    }
+                }
+            } else if (state.records.isEmpty()) {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "No Maintenance History",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = Color(0xFF0F172A)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "No maintenance records logged yet for this vehicle.",
+                                fontSize = 13.sp,
+                                color = Color(0xFF64748B)
+                            )
+                        }
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
-                ) {
-                    itemsIndexed(state.records, key = { _, r -> r.id }) { index, record ->
-                        ServiceHistoryCard(
-                            recordNumber = index + 1,
-                            item = record,
-                            onClick = { selectedRecordForDialog = record }
-                        )
-                    }
+                items(state.records, key = { it.id }) { record ->
+                    MaintenanceHistoryRecordCard(
+                        record = record,
+                        onClick = { selectedRecordForDialog = record }
+                    )
                 }
             }
         }
@@ -298,38 +316,56 @@ fun VehicleMaintenanceDetailsScreen(
         val record = selectedRecordForDialog!!
         AlertDialog(
             onDismissRequest = { selectedRecordForDialog = null },
+            containerColor = Color.White,
+            titleContentColor = Color(0xFF0F172A),
+            textContentColor = Color(0xFF475569),
             title = {
                 Text(
                     text = record.serviceType,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    color = BhpTextPrimary
+                    fontSize = 18.sp,
+                    color = Color(0xFF0F172A)
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Service Date: ${MaintenanceFormattingHelper.formatDisplayDate(record.maintenanceDate)}", fontSize = 13.sp)
-                    Text("Cost: ${MaintenanceFormattingHelper.formatIndianRupee(record.cost)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF16A34A))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Service Date: ${MaintenanceFormattingHelper.formatDisplayDate(record.maintenanceDate)}",
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        text = "Cost: ${MaintenanceFormattingHelper.formatIndianRupee(record.cost)}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF16A34A)
+                    )
                     if (record.odometerReadingKm != null) {
                         val odoStr = NumberFormat.getIntegerInstance(Locale.US).format(record.odometerReadingKm)
-                        Text("Odometer: $odoStr km", fontSize = 13.sp)
+                        Text(text = "Odometer: $odoStr km", fontSize = 13.sp)
                     }
                     if (!record.serviceCenter.isNullOrBlank()) {
-                        Text("Workshop: ${record.serviceCenter}", fontSize = 13.sp)
+                        Text(text = "Workshop: ${record.serviceCenter}", fontSize = 13.sp)
                     }
                     if (!record.nextServiceDate.isNullOrBlank()) {
-                        Text("Next Service: ${MaintenanceFormattingHelper.formatDisplayDate(record.nextServiceDate)}", fontSize = 13.sp)
+                        Text(
+                            text = "Next Service: ${MaintenanceFormattingHelper.formatDisplayDate(record.nextServiceDate)}",
+                            fontSize = 13.sp
+                        )
                     }
                     if (record.description.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("Description:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Text(record.description, fontSize = 12.sp, color = BhpTextSecondary)
+                        Text(text = "Description:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text(text = record.description, fontSize = 12.sp, color = Color(0xFF64748B))
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { selectedRecordForDialog = null }) {
-                    Text("Close", color = Color(0xFF16A34A), fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Close",
+                        color = Color(0xFF16A34A),
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         )
@@ -337,85 +373,104 @@ fun VehicleMaintenanceDetailsScreen(
 }
 
 @Composable
-private fun ServiceHistoryCard(
-    recordNumber: Int,
-    item: MaintenanceHistoryRecordItem,
+private fun MaintenanceHistoryRecordCard(
+    record: MaintenanceHistoryRecordItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, BhpCardBorder, RoundedCornerShape(14.dp))
             .clickable { onClick() }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Record $recordNumber",
-                fontSize = 11.sp,
-                color = BhpTextMuted,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = item.serviceType,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = BhpTextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Row 1: Date | Odometer
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Date Badge on Left (Day, Month, Year)
+            val dateParts = MaintenanceFormattingHelper.parseDateBadge(record.maintenanceDate)
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFFF8FAFC),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                modifier = Modifier.width(52.dp)
             ) {
+                Column(
+                    modifier = Modifier.padding(vertical = 6.dp, horizontal = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = dateParts.day,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    Text(
+                        text = dateParts.month,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF64748B)
+                    )
+                    Text(
+                        text = dateParts.year,
+                        fontSize = 10.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            // Middle Column: Service Type & Workshop
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Date: ${MaintenanceFormattingHelper.formatDisplayDate(item.maintenanceDate)}",
-                    fontSize = 13.sp,
-                    color = Color(0xFF475569)
+                    text = record.serviceType,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
                 )
 
-                val odoFormatted = if (item.odometerReadingKm != null) {
-                    NumberFormat.getIntegerInstance(Locale.US).format(item.odometerReadingKm)
-                } else "N/A"
+                Spacer(modifier = Modifier.height(4.dp))
+
+                val workshopText = if (!record.serviceCenter.isNullOrBlank()) {
+                    "Service Centre: ${record.serviceCenter}"
+                } else if (record.description.isNotBlank()) {
+                    record.description
+                } else {
+                    "General Service"
+                }
+
                 Text(
-                    text = "Odometer: $odoFormatted km",
-                    fontSize = 13.sp,
-                    color = Color(0xFF475569)
+                    text = workshopText,
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
-            // Row 2: Cost | Status
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            // Right: Cost + Chevron
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Cost: ${MaintenanceFormattingHelper.formatIndianRupee(item.cost)}",
-                    fontSize = 13.sp,
-                    color = Color(0xFF475569)
+                    text = MaintenanceFormattingHelper.formatIndianRupee(record.cost),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF16A34A)
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Status: ",
-                        fontSize = 13.sp,
-                        color = BhpTextSecondary
-                    )
-                    Text(
-                        text = "Completed",
-                        fontSize = 13.sp,
-                        color = Color(0xFF16A34A),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Spacer(modifier = Modifier.width(6.dp))
+
+                ChevronRightIcon(
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }

@@ -26,6 +26,10 @@ jwt:
   secret: "test_jwt_secret_must_be_at_least_256_bits_for_hmac_sha256_security_testing_only"
   expiration-ms: 3600000
 
+app:
+  document:
+    upload-dir: target/test-uploads/documents
+
 bootstrap:
   owner:
     username: ""

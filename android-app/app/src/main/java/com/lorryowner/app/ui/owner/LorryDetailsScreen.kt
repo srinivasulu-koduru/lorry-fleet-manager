@@ -342,6 +342,186 @@ fun LorryDetailsScreen(
                             )
                         }
                     }
+
+                    // VEHICLE DOCUMENTS SECTION
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    var showUploadDocDialog by remember { mutableStateOf(false) }
+                    var selectedDocUri by remember { mutableStateOf<android.net.Uri?>(null) }
+                    var selectedDocName by remember { mutableStateOf("") }
+                    var docTitleInput by remember { mutableStateOf("") }
+                    var uploadDialogError by remember { mutableStateOf<String?>(null) }
+
+                    val docPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+                    ) { uri ->
+                        if (uri != null) {
+                            val (fname, _) = com.lorryowner.app.network.DocumentApiService.extractFileInfoFromUri(context, uri)
+                            selectedDocUri = uri
+                            selectedDocName = fname
+                            if (docTitleInput.isBlank()) {
+                                docTitleInput = fname.substringBeforeLast(".")
+                            }
+                        }
+                    }
+
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = CardDefaults.outlinedCardBorder(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Vehicle Documents",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = BhpTextPrimary,
+                                            fontSize = 16.sp
+                                        )
+                                    )
+                                    Text(
+                                        text = "RC, Insurance, Fitness, Permit, PUC",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = BhpTextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        selectedDocUri = null
+                                        selectedDocName = ""
+                                        docTitleInput = ""
+                                        uploadDialogError = null
+                                        showUploadDocDialog = true
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = BhpDarkForestGreen),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("+ Add", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+
+                            if (state.isUploadingDocument) {
+                                LinearProgressIndicator(
+                                    color = BhpDarkForestGreen,
+                                    modifier = Modifier.fillMaxWidth().height(4.dp)
+                                )
+                            }
+
+                            if (state.documentError != null) {
+                                Text(
+                                    text = state.documentError,
+                                    color = BhpErrorRed,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
+                            if (state.vehicleDocuments.isEmpty()) {
+                                com.lorryowner.app.ui.components.EmptyDocumentsView("No vehicle documents uploaded yet.")
+                            } else {
+                                for (doc in state.vehicleDocuments) {
+                                    com.lorryowner.app.ui.components.DocumentCard(
+                                        document = doc,
+                                        sessionManager = sessionManager,
+                                        canDelete = true,
+                                        onDelete = { viewModel.deleteVehicleDocument(it.id) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (showUploadDocDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showUploadDocDialog = false },
+                            containerColor = Color.White,
+                            title = { Text("Upload Vehicle Document", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    val suggestions = listOf("RC", "Insurance", "Fitness Certificate", "Permit", "PUC")
+                                    Text("Suggested Titles:", fontSize = 11.sp, color = BhpTextSecondary)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        suggestions.take(3).forEach { s ->
+                                            FilterChip(
+                                                selected = docTitleInput == s,
+                                                onClick = { docTitleInput = s },
+                                                label = { Text(s, fontSize = 10.sp) }
+                                            )
+                                        }
+                                    }
+
+                                    OutlinedTextField(
+                                        value = docTitleInput,
+                                        onValueChange = {
+                                            docTitleInput = it
+                                            uploadDialogError = null
+                                        },
+                                        label = { Text("Document Title *") },
+                                        placeholder = { Text("e.g. Registration Certificate (RC)") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    OutlinedButton(
+                                        onClick = { docPickerLauncher.launch("*/*") },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(if (selectedDocName.isNotBlank()) selectedDocName else "Choose PDF or Image")
+                                    }
+
+                                    if (uploadDialogError != null) {
+                                        Text(uploadDialogError!!, color = BhpErrorRed, fontSize = 11.sp)
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        if (docTitleInput.trim().isBlank()) {
+                                            uploadDialogError = "Document title is required"
+                                            return@Button
+                                        }
+                                        val uri = selectedDocUri
+                                        if (uri == null) {
+                                            uploadDialogError = "Please select a file"
+                                            return@Button
+                                        }
+                                        viewModel.uploadVehicleDocument(context, docTitleInput.trim(), uri)
+                                        showUploadDocDialog = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = BhpDarkForestGreen)
+                                ) {
+                                    Text("Upload", color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showUploadDocDialog = false }) {
+                                    Text("Cancel", color = BhpTextSecondary)
+                                }
+                            }
+                        )
+                    }
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -357,27 +537,50 @@ fun LorryDetailsScreen(
             if (isCurrentTripDialogVisible && lorry != null) {
                 AlertDialog(
                     onDismissRequest = { isCurrentTripDialogVisible = false },
+                    containerColor = Color.White,
+                    titleContentColor = BhpTextPrimary,
+                    textContentColor = BhpTextPrimary,
                     title = {
-                        Text(
-                            text = "Active Trip: ${lorry.activeTripReference ?: "Ongoing"}",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = lorry.activeTripReference ?: "Active Trip",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                color = BhpTextPrimary
+                            )
+                            TripStatusBadge(status = "IN_PROGRESS")
+                        }
                     },
                     text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("📍 Route: ${lorry.activeTripOrigin} → ${lorry.activeTripDestination}", fontSize = 14.sp)
-                            Text("👤 Driver: ${lorry.assignedDriverName ?: "Unassigned"}", fontSize = 14.sp)
-                            Text("🚚 Lorry: ${lorry.registrationNumber} (${lorry.makeModel})", fontSize = 14.sp)
-                            Text("⏳ Status: In Progress (${lorry.activeTripEtaFormatted})", fontSize = 14.sp)
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "📍 ${lorry.activeTripOrigin ?: "Origin"} → ${lorry.activeTripDestination ?: "Destination"}",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = BhpTextPrimary
+                            )
+                            HorizontalDivider(color = Color(0xFFF1F5F9))
+                            Text("👤 Driver: ${lorry.assignedDriverName ?: "Unassigned"}", fontSize = 13.sp, color = BhpTextSecondary)
+                            Text("🚚 Lorry: ${lorry.registrationNumber} (${lorry.makeModel})", fontSize = 13.sp, color = BhpTextSecondary)
+                            Text("⏳ Status: In Progress (${lorry.activeTripEtaFormatted})", fontSize = 13.sp, color = BhpTextSecondary)
                             if (lorry.activeTripStartTime != null) {
-                                Text("🕒 Started: ${lorry.activeTripStartTime.take(16).replace("T", " ")}", fontSize = 14.sp)
+                                Text("🕒 Started: ${lorry.activeTripStartTime.take(16).replace("T", " ")}", fontSize = 13.sp, color = BhpTextSecondary)
                             }
                         }
                     },
                     confirmButton = {
-                        Button(onClick = { isCurrentTripDialogVisible = false }) {
-                            Text("Close")
+                        Button(
+                            onClick = { isCurrentTripDialogVisible = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = BhpDarkForestGreen)
+                        ) {
+                            Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 )

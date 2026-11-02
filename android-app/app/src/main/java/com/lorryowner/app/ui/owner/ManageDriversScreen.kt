@@ -764,7 +764,7 @@ fun DriverCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Bottom Section: Trips, Divider, Distance, Trips Button, View Details Button
+            // Metrics Row: Completed Trips | Total Distance
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -789,7 +789,7 @@ fun DriverCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(20.dp))
 
                 // Vertical Divider
                 Box(
@@ -799,7 +799,7 @@ fun DriverCard(
                         .background(Color(0xFFE2E8F0))
                 )
 
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(20.dp))
 
                 // Column 2: Total Distance Travelled
                 Column {
@@ -820,27 +820,38 @@ fun DriverCard(
                         )
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+            Spacer(modifier = Modifier.height(12.dp))
 
+            // Actions Row: Dedicated full-width buttons for touch friendliness and clear labels
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 // Trips Button
                 OutlinedButton(
                     onClick = onViewTrips,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, BhpDriverBlue),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "Trips",
+                        text = "View Trips",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = BhpDriverBlue,
-                            fontSize = 12.sp
-                        )
+                            fontSize = 13.sp
+                        ),
+                        maxLines = 1
                     )
                 }
-
-                Spacer(modifier = Modifier.width(6.dp))
 
                 // View Details Button
                 Button(
@@ -849,15 +860,19 @@ fun DriverCard(
                         containerColor = BhpDriverBlue,
                         contentColor = Color.White
                     ),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "Details",
+                        text = "Driver Details",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                            fontSize = 13.sp
+                        ),
+                        maxLines = 1
                     )
                 }
             }

@@ -3,29 +3,42 @@ package com.lorryowner.app.ui.theme
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val BhpColorScheme = darkColorScheme(
+private val BhpColorScheme = lightColorScheme(
     primary = BhpDarkForestGreen,
-    onPrimary = BhpCardWhite,
-    primaryContainer = BhpDarkForestGreen,
-    onPrimaryContainer = BhpCardWhite,
-    secondary = BhpBrightGreen,
-    onSecondary = BhpDeepTeal,
-    background = BhpDeepTeal,
-    onBackground = BhpCardWhite,
-    surface = BhpCardWhite,
-    onSurface = BhpTextBlack,
-    surfaceVariant = BhpInputBg,
-    onSurfaceVariant = BhpTextMuted,
+    onPrimary = Color.White,
+    primaryContainer = BhpRunningGreenBg,
+    onPrimaryContainer = BhpDarkForestGreen,
+    secondary = BhpReadyBlue,
+    onSecondary = Color.White,
+    secondaryContainer = BhpReadyBlueBg,
+    onSecondaryContainer = BhpReadyBlueText,
+    tertiary = BhpBrightGreen,
+    onTertiary = BhpDeepTeal,
+    background = BhpScreenBg,
+    onBackground = BhpTextPrimary,
+    surface = Color.White,
+    onSurface = BhpTextPrimary,
+    surfaceVariant = Color.White,
+    onSurfaceVariant = BhpTextSecondary,
+    surfaceContainer = Color.White,
+    surfaceContainerLow = Color.White,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color.White,
+    surfaceBright = Color.White,
+    surfaceDim = Color(0xFFF8FAFC),
     outline = BhpInputBorder,
+    outlineVariant = BhpCardBorder,
     error = BhpErrorRed,
-    onError = BhpCardWhite
+    onError = Color.White
 )
 
 @Composable
@@ -39,8 +52,8 @@ fun LorryOwnerAppTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = BhpDeepTeal.toArgb()
-            window.navigationBarColor = BhpCardWhite.toArgb()
+            window.statusBarColor = BhpNavyDark.toArgb()
+            window.navigationBarColor = Color.White.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
             WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
         }

@@ -1,8 +1,12 @@
 package com.lorryowner.app.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -10,6 +14,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
@@ -1014,6 +1019,420 @@ fun DocumentTextIcon(
             end = Offset(w * 0.66f, h * 0.60f),
             strokeWidth = w * 0.07f,
             cap = StrokeCap.Round
+        )
+    }
+}
+
+@Composable
+fun CoinsStackIcon(
+    tint: Color = Color(0xFF059669),
+    modifier: Modifier = Modifier.size(36.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Left coin stack (3 coins)
+        for (i in 0..2) {
+            val yOffset = h * (0.64f - i * 0.11f)
+            drawOval(
+                color = tint,
+                topLeft = Offset(w * 0.04f, yOffset),
+                size = Size(w * 0.44f, h * 0.20f)
+            )
+            drawOval(
+                color = Color.White.copy(alpha = 0.22f),
+                topLeft = Offset(w * 0.07f, yOffset + h * 0.02f),
+                size = Size(w * 0.38f, h * 0.14f)
+            )
+        }
+
+        // Right coin stack (4 coins)
+        for (i in 0..3) {
+            val yOffset = h * (0.60f - i * 0.11f)
+            drawOval(
+                color = tint,
+                topLeft = Offset(w * 0.48f, yOffset),
+                size = Size(w * 0.48f, h * 0.20f)
+            )
+            drawOval(
+                color = Color.White.copy(alpha = 0.25f),
+                topLeft = Offset(w * 0.51f, yOffset + h * 0.02f),
+                size = Size(w * 0.42f, h * 0.14f)
+            )
+        }
+    }
+}
+
+@Composable
+fun HeroWhiteTruckGraphic(
+    modifier: Modifier = Modifier.size(130.dp, 90.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Container / Trailer (Right side, perspective)
+        val trailerPath = Path().apply {
+            moveTo(w * 0.35f, h * 0.10f)
+            lineTo(w * 0.98f, h * 0.22f)
+            lineTo(w * 0.98f, h * 0.72f)
+            lineTo(w * 0.35f, h * 0.76f)
+            close()
+        }
+        drawPath(
+            path = trailerPath,
+            color = Color(0xFFF1F5F9), // Clean silver-white
+            style = androidx.compose.ui.graphics.drawscope.Fill
+        )
+        drawPath(
+            path = trailerPath,
+            color = Color(0xFFCBD5E1),
+            style = Stroke(width = w * 0.015f)
+        )
+
+        // Cab Body (Left side, angled towards viewer)
+        val cabPath = Path().apply {
+            moveTo(w * 0.08f, h * 0.38f)
+            lineTo(w * 0.36f, h * 0.24f)
+            lineTo(w * 0.36f, h * 0.76f)
+            lineTo(w * 0.05f, h * 0.76f)
+            lineTo(w * 0.05f, h * 0.45f)
+            close()
+        }
+        drawPath(
+            path = cabPath,
+            color = Color(0xFFE2E8F0),
+            style = androidx.compose.ui.graphics.drawscope.Fill
+        )
+
+        // Cab Windshield
+        val windshield = Path().apply {
+            moveTo(w * 0.09f, h * 0.40f)
+            lineTo(w * 0.33f, h * 0.28f)
+            lineTo(w * 0.33f, h * 0.48f)
+            lineTo(w * 0.08f, h * 0.52f)
+            close()
+        }
+        drawPath(
+            path = windshield,
+            color = Color(0xFF1E293B), // Dark tinted glass
+            style = androidx.compose.ui.graphics.drawscope.Fill
+        )
+
+        // Front Grille
+        drawRoundRect(
+            color = Color(0xFF94A3B8),
+            topLeft = Offset(w * 0.06f, h * 0.56f),
+            size = Size(w * 0.20f, h * 0.16f),
+            cornerRadius = CornerRadius(w * 0.02f, w * 0.02f)
+        )
+
+        // Green EV / Eco plate on bumper
+        drawRoundRect(
+            color = Color(0xFF10B981),
+            topLeft = Offset(w * 0.10f, h * 0.72f),
+            size = Size(w * 0.10f, h * 0.04f),
+            cornerRadius = CornerRadius(w * 0.01f, w * 0.01f)
+        )
+
+        // Wheels
+        drawCircle(
+            color = Color(0xFF0F172A),
+            radius = w * 0.08f,
+            center = Offset(w * 0.20f, h * 0.80f)
+        )
+        drawCircle(
+            color = Color(0xFF94A3B8),
+            radius = w * 0.04f,
+            center = Offset(w * 0.20f, h * 0.80f)
+        )
+
+        drawCircle(
+            color = Color(0xFF0F172A),
+            radius = w * 0.08f,
+            center = Offset(w * 0.65f, h * 0.80f)
+        )
+        drawCircle(
+            color = Color(0xFF94A3B8),
+            radius = w * 0.04f,
+            center = Offset(w * 0.65f, h * 0.80f)
+        )
+        drawCircle(
+            color = Color(0xFF0F172A),
+            radius = w * 0.08f,
+            center = Offset(w * 0.82f, h * 0.78f)
+        )
+        drawCircle(
+            color = Color(0xFF94A3B8),
+            radius = w * 0.04f,
+            center = Offset(w * 0.82f, h * 0.78f)
+        )
+    }
+}
+
+@Composable
+fun HamburgerMenuIcon(
+    tint: Color = Color(0xFF0F172A),
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = w * 0.09f
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.15f, h * 0.28f),
+            end = Offset(w * 0.85f, h * 0.28f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.15f, h * 0.50f),
+            end = Offset(w * 0.85f, h * 0.50f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.15f, h * 0.72f),
+            end = Offset(w * 0.85f, h * 0.72f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+@Composable
+fun FinanceTrendingIcon(
+    tint: Color = Color(0xFF0F172A),
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = w * 0.10f
+
+        // Trend line with points
+        val path = Path().apply {
+            moveTo(w * 0.15f, h * 0.75f)
+            lineTo(w * 0.42f, h * 0.50f)
+            lineTo(w * 0.60f, h * 0.65f)
+            lineTo(w * 0.88f, h * 0.25f)
+        }
+        drawPath(
+            path = path,
+            color = tint,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+
+        // Arrow head pointing top-right
+        val arrow = Path().apply {
+            moveTo(w * 0.68f, h * 0.25f)
+            lineTo(w * 0.88f, h * 0.25f)
+            lineTo(w * 0.88f, h * 0.45f)
+        }
+        drawPath(
+            path = arrow,
+            color = tint,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+    }
+}
+
+@Composable
+fun UpTrendCircleIcon(
+    modifier: Modifier = Modifier.size(28.dp),
+    backgroundColor: Color = Color(0xFF10B981).copy(alpha = 0.2f),
+    arrowColor: Color = Color(0xFF10B981)
+) {
+    Box(
+        modifier = modifier
+            .background(backgroundColor, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(14.dp)) {
+            val w = size.width
+            val h = size.height
+            val stroke = w * 0.16f
+
+            // Arrow shaft
+            drawLine(
+                color = arrowColor,
+                start = Offset(w * 0.5f, h * 0.85f),
+                end = Offset(w * 0.5f, h * 0.15f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+            // Arrow head
+            drawLine(
+                color = arrowColor,
+                start = Offset(w * 0.22f, h * 0.42f),
+                end = Offset(w * 0.5f, h * 0.15f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = arrowColor,
+                start = Offset(w * 0.78f, h * 0.42f),
+                end = Offset(w * 0.5f, h * 0.15f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+@Composable
+fun DownTrendCircleIcon(
+    modifier: Modifier = Modifier.size(28.dp),
+    backgroundColor: Color = Color(0xFFEF4444).copy(alpha = 0.2f),
+    arrowColor: Color = Color(0xFFEF4444)
+) {
+    Box(
+        modifier = modifier
+            .background(backgroundColor, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(14.dp)) {
+            val w = size.width
+            val h = size.height
+            val stroke = w * 0.16f
+
+            // Arrow shaft
+            drawLine(
+                color = arrowColor,
+                start = Offset(w * 0.5f, h * 0.15f),
+                end = Offset(w * 0.5f, h * 0.85f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+            // Arrow head
+            drawLine(
+                color = arrowColor,
+                start = Offset(w * 0.22f, h * 0.58f),
+                end = Offset(w * 0.5f, h * 0.85f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = arrowColor,
+                start = Offset(w * 0.78f, h * 0.58f),
+                end = Offset(w * 0.5f, h * 0.85f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+@Composable
+fun TrophyIcon(
+    tint: Color = Color(0xFFEAB308),
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // Cup body
+        val cupPath = Path().apply {
+            moveTo(w * 0.25f, h * 0.20f)
+            lineTo(w * 0.75f, h * 0.20f)
+            cubicTo(w * 0.75f, h * 0.55f, w * 0.65f, h * 0.65f, w * 0.50f, h * 0.65f)
+            cubicTo(w * 0.35f, h * 0.65f, w * 0.25f, h * 0.55f, w * 0.25f, h * 0.20f)
+            close()
+        }
+        drawPath(path = cupPath, color = tint)
+
+        // Stem
+        drawRect(
+            color = tint,
+            topLeft = Offset(w * 0.44f, h * 0.65f),
+            size = Size(w * 0.12f, h * 0.15f)
+        )
+
+        // Base
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(w * 0.30f, h * 0.78f),
+            size = Size(w * 0.40f, h * 0.10f),
+            cornerRadius = CornerRadius(w * 0.03f, w * 0.03f)
+        )
+
+        // Handles
+        drawArc(
+            color = tint,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(w * 0.12f, h * 0.25f),
+            size = Size(w * 0.25f, h * 0.25f),
+            style = Stroke(width = w * 0.07f)
+        )
+        drawArc(
+            color = tint,
+            startAngle = 0f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(w * 0.63f, h * 0.25f),
+            size = Size(w * 0.25f, h * 0.25f),
+            style = Stroke(width = w * 0.07f)
+        )
+    }
+}
+
+@Composable
+fun FilterSlidersIcon(
+    tint: Color = Color(0xFF0F172A),
+    modifier: Modifier = Modifier.size(24.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = w * 0.08f
+
+        // Slider 1 (Top)
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.15f, h * 0.25f),
+            end = Offset(w * 0.85f, h * 0.25f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawCircle(
+            color = tint,
+            radius = w * 0.10f,
+            center = Offset(w * 0.40f, h * 0.25f)
+        )
+
+        // Slider 2 (Middle)
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.15f, h * 0.50f),
+            end = Offset(w * 0.85f, h * 0.50f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawCircle(
+            color = tint,
+            radius = w * 0.10f,
+            center = Offset(w * 0.70f, h * 0.50f)
+        )
+
+        // Slider 3 (Bottom)
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.15f, h * 0.75f),
+            end = Offset(w * 0.85f, h * 0.75f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawCircle(
+            color = tint,
+            radius = w * 0.10f,
+            center = Offset(w * 0.30f, h * 0.75f)
         )
     }
 }

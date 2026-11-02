@@ -12,6 +12,7 @@ class MaintenanceModelTest {
         assertEquals(0L, viewModel.uiState.totalVehicles)
         assertEquals(0L, viewModel.uiState.dueSoonCount)
         assertEquals(0L, viewModel.uiState.overdueCount)
+        assertEquals(0L, viewModel.uiState.upToDateCount)
         assertEquals(0.0, viewModel.uiState.totalExpenditure, 0.001)
         assertTrue(viewModel.uiState.vehicles.isEmpty())
         assertFalse(viewModel.uiState.isLoading)
@@ -59,6 +60,7 @@ class MaintenanceModelTest {
                 totalVehicles = 5,
                 dueSoonCount = 2,
                 overdueCount = 1,
+                upToDateCount = 2,
                 totalExpenditure = 39500.0,
                 vehicles = sampleVehicles
             )
@@ -67,6 +69,7 @@ class MaintenanceModelTest {
         assertEquals(5L, viewModel.uiState.totalVehicles)
         assertEquals(2L, viewModel.uiState.dueSoonCount)
         assertEquals(1L, viewModel.uiState.overdueCount)
+        assertEquals(2L, viewModel.uiState.upToDateCount)
         assertEquals(39500.0, viewModel.uiState.totalExpenditure, 0.001)
         assertEquals(3, viewModel.uiState.vehicles.size)
         assertEquals("Up to Date", viewModel.uiState.vehicles[0].status)
@@ -223,5 +226,59 @@ class MaintenanceModelTest {
         val formatted = MaintenanceFormattingHelper.formatIndianRupee(16500.0)
         assertTrue(formatted.contains("16,500") || formatted.contains("16500"))
         assertTrue(formatted.contains("₹"))
+    }
+
+    @Test
+    fun dashboardViewModel_currentMonthExpense_populatesCorrectly() {
+        val viewModel = MaintenanceDashboardViewModel(sessionManager = null, autoLoad = false)
+        viewModel.setTestData(
+            MaintenanceDashboardUiState(
+                currentMonthExpense = 24500.0,
+                currentMonth = "October",
+                currentYear = 2026,
+                vehicles = listOf(
+                    VehicleMaintenanceSummaryItem(
+                        lorryId = 1L,
+                        registrationNumber = "AP 02 AB 1234",
+                        makeModel = "Tata • 12 Wheeler",
+                        lastServiceDate = "2026-10-18",
+                        nextServiceDate = "2027-01-18",
+                        status = "Up to Date",
+                        totalCost = 24500.0,
+                        totalRecordsCount = 8
+                    )
+                )
+            )
+        )
+
+        assertEquals(24500.0, viewModel.uiState.currentMonthExpense, 0.001)
+        assertEquals("October", viewModel.uiState.currentMonth)
+        assertEquals(2026, viewModel.uiState.currentYear)
+        assertEquals(1, viewModel.uiState.vehicles.size)
+        assertEquals(8, viewModel.uiState.vehicles[0].totalRecordsCount)
+    }
+
+    @Test
+    fun formattingHelper_parseDateBadge_parsesIsoDateCorrectly() {
+        val badge = MaintenanceFormattingHelper.parseDateBadge("2026-10-18")
+        assertEquals("18", badge.day)
+        assertEquals("Oct", badge.month)
+        assertEquals("2026", badge.year)
+
+        val badgeSingleDigit = MaintenanceFormattingHelper.parseDateBadge("2026-09-05")
+        assertEquals("05", badgeSingleDigit.day)
+        assertEquals("Sep", badgeSingleDigit.month)
+        assertEquals("2026", badgeSingleDigit.year)
+    }
+
+    @Test
+    fun formattingHelper_parseDateBadge_handlesFallbackForInvalidDate() {
+        val badgeNull = MaintenanceFormattingHelper.parseDateBadge(null)
+        assertEquals("--", badgeNull.day)
+        assertEquals("---", badgeNull.month)
+
+        val badgeEmpty = MaintenanceFormattingHelper.parseDateBadge("")
+        assertEquals("--", badgeEmpty.day)
+        assertEquals("---", badgeEmpty.month)
     }
 }

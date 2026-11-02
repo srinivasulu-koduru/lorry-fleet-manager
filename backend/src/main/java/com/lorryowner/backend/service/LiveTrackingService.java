@@ -322,15 +322,42 @@ public class LiveTrackingService {
     }
 
     private double[] resolveCoordinatesForCity(String locationName) {
-        if (locationName == null) return new double[]{17.3850, 78.4867};
-        String lower = locationName.toLowerCase();
-        if (lower.contains("hyderabad")) return new double[]{17.3850, 78.4867};
-        if (lower.contains("kurnool")) return new double[]{15.8281, 78.0373};
-        if (lower.contains("nellore")) return new double[]{14.4426, 79.9865};
-        if (lower.contains("vijayawada")) return new double[]{16.5062, 80.6480};
-        if (lower.contains("visakhapatnam") || lower.contains("vizag")) return new double[]{17.6868, 83.2185};
-        if (lower.contains("chennai")) return new double[]{13.0827, 80.2707};
+        if (locationName == null || locationName.trim().isBlank()) return new double[]{17.3850, 78.4867};
+        String lower = locationName.toLowerCase().trim();
+        if (lower.contains("anantapur") || lower.contains("ananthapur") || lower.contains("atp")) return new double[]{14.6819, 77.6006};
+        if (lower.contains("tadipatri") || lower.contains("tadipati") || lower.contains("tadpatri")) return new double[]{14.9123, 78.0125};
+        if (lower.contains("kadapa") || lower.contains("cudappah") || lower.contains("cuddapah")) return new double[]{14.4674, 78.8241};
+        if (lower.contains("tirupati") || lower.contains("tirupathi")) return new double[]{13.6288, 79.4192};
+        if (lower.contains("nellore") || lower.contains("nellur")) return new double[]{14.4426, 79.9865};
+        if (lower.contains("kurnool") || lower.contains("kurnul")) return new double[]{15.8281, 78.0373};
+        if (lower.contains("nandyal")) return new double[]{15.4886, 78.4836};
+        if (lower.contains("proddatur")) return new double[]{14.7526, 78.5522};
+        if (lower.contains("gooty") || lower.contains("gutti")) return new double[]{15.1147, 77.6366};
+        if (lower.contains("dhone")) return new double[]{15.4200, 77.8700};
+        if (lower.contains("hindupur")) return new double[]{13.8289, 77.4919};
+        if (lower.contains("dharmavaram")) return new double[]{14.4137, 77.7126};
+        if (lower.contains("vijayawada") || lower.contains("bezawada")) return new double[]{16.5062, 80.6480};
+        if (lower.contains("guntur")) return new double[]{16.3067, 80.4365};
+        if (lower.contains("ongole")) return new double[]{15.5057, 80.0499};
+        if (lower.contains("chittoor") || lower.contains("chittur")) return new double[]{13.2172, 79.1003};
+        if (lower.contains("visakhapatnam") || lower.contains("visakapatnam") || lower.contains("vizag")) return new double[]{17.6868, 83.2185};
+        if (lower.contains("rajahmundry") || lower.contains("rajamundry")) return new double[]{17.0005, 81.8040};
+        if (lower.contains("kakinada")) return new double[]{16.9891, 82.2475};
+        if (lower.contains("hyderabad") || lower.contains("secunderabad")) return new double[]{17.3850, 78.4867};
+        if (lower.contains("warangal")) return new double[]{17.9784, 79.5941};
+        if (lower.contains("nizamabad")) return new double[]{18.6725, 78.0941};
+        if (lower.contains("karimnagar")) return new double[]{18.4386, 79.1288};
+        if (lower.contains("khammam")) return new double[]{17.2473, 80.1514};
+        if (lower.contains("mahbubnagar") || lower.contains("mahabubnagar")) return new double[]{16.7488, 77.9856};
+        if (lower.contains("nalgonda")) return new double[]{17.0575, 79.2684};
+        if (lower.contains("raichur")) return new double[]{16.2076, 77.3463};
+        if (lower.contains("bellary") || lower.contains("ballari")) return new double[]{15.1394, 76.9214};
+        if (lower.contains("hubli") || lower.contains("hubballi")) return new double[]{15.3647, 75.1240};
         if (lower.contains("bengaluru") || lower.contains("bangalore")) return new double[]{12.9716, 77.5946};
+        if (lower.contains("chennai") || lower.contains("madras")) return new double[]{13.0827, 80.2707};
+        if (lower.contains("pune")) return new double[]{18.5204, 73.8567};
+        if (lower.contains("mumbai") || lower.contains("bombay")) return new double[]{19.0760, 72.8777};
+        if (lower.contains("delhi")) return new double[]{28.6139, 77.2090};
         return new double[]{17.3850, 78.4867}; // Default Andhra/Telangana hub
     }
 

@@ -52,4 +52,18 @@ public class OwnerTripController {
         TripResponseDto response = ownerTripService.getTripById(id, ownerUsername);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Cancels a planned trip.
+     * POST /api/owner/trips/{id}/cancel
+     */
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<TripResponseDto> cancelTrip(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        String ownerUsername = authentication != null ? authentication.getName() : null;
+        TripResponseDto cancelled = ownerTripService.cancelTrip(id, ownerUsername);
+        return ResponseEntity.ok(cancelled);
+    }
 }

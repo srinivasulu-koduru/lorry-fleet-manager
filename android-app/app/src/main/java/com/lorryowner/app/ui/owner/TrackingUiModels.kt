@@ -1,5 +1,6 @@
 package com.lorryowner.app.ui.owner
 
+import com.google.android.gms.maps.model.LatLng
 import java.text.DecimalFormat
 
 data class BreadcrumbPoint(
@@ -43,7 +44,12 @@ data class LiveTrackingLorryUiState(
     val originLongitude: Double? = null,
     val destinationLatitude: Double? = null,
     val destinationLongitude: Double? = null,
-    val breadcrumbs: List<BreadcrumbPoint> = emptyList()
+    val breadcrumbs: List<BreadcrumbPoint> = emptyList(),
+    val plannedRoadRoute: List<LatLng> = emptyList(),
+    val isRouteDeviated: Boolean = false,
+    val deviationDistanceKm: Double = 0.0,
+    val isRouteLoading: Boolean = false,
+    val routeErrorMessage: String? = null
 )
 
 data class RunningLorriesUiState(

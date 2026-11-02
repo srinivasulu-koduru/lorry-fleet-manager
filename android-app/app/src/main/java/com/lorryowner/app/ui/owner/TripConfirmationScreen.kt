@@ -124,9 +124,10 @@ fun TripConfirmationScreen(
                     }
 
                     // Confirm & Create Button
+                    val context = androidx.compose.ui.platform.LocalContext.current
                     Button(
                         onClick = {
-                            viewModel.submitTrip { created ->
+                            viewModel.submitTrip(context) { created ->
                                 onTripCreated(created)
                             }
                         },
@@ -150,7 +151,7 @@ fun TripConfirmationScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Creating...",
+                                text = state.uploadProgressText ?: "Creating...",
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
@@ -638,6 +639,62 @@ fun TripConfirmationScreen(
                                     fontSize = 13.sp
                                 )
                             )
+                        }
+                    }
+                }
+            }
+
+            // Staged Trip Documents Card (if any)
+            if (state.stagedDocuments.isNotEmpty()) {
+                Surface(
+                    color = BhpCardWhite,
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 1.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BhpCardBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "TRIP DOCUMENTS (${state.stagedDocuments.size})",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = BhpDarkForestGreen,
+                                fontSize = 11.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                        )
+
+                        state.stagedDocuments.forEach { doc ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFF8FAFC))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFEFF6FF)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("DOC", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2563EB))
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(doc.title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = BhpTextPrimary)
+                                    Text(
+                                        "${doc.originalFilename} • ${com.lorryowner.app.network.DocumentApiService.formatFileSize(doc.sizeBytes)}",
+                                        fontSize = 11.sp,
+                                        color = BhpTextSecondary
+                                    )
+                                }
+                            }
                         }
                     }
                 }

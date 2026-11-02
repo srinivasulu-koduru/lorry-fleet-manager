@@ -1,7 +1,9 @@
-﻿# Android / Gradle
+# Android / Gradle
 .gradle/
 **/build/
 local.properties
+*.apk
+*.aab
 *.iml
 .idea/
 captures/
@@ -23,6 +25,18 @@ application-secret.yml
 
 # Logs
 *.log
+
+# Uploaded User Documents & Media
+uploads/
+**/uploads/
+
+# Local Testing Reports & Credentials
+testing-reports/
+**/testing-reports/
+*Credentials*.txt
+*.jks
+*.keystore
+
 
 # OS files
 .DS_Store
