@@ -1,0 +1,13 @@
+android-app/
+backend/target/
+.git/
+.gitignore
+*.log
+uploads/
+.idea/
+*.iml
+.vscode/
+.env
+.env.*
+*.apk
+testing-reports/

@@ -1,0 +1,45 @@
+# ==============================================================================
+# BHP Logistics Fleet Manager - Root Dockerfile
+# Multi-stage production build from repository root
+# Tuned for Voroa Free Nano (512 MB RAM limit)
+# ==============================================================================
+
+# --- Stage 1: Build the Application JAR ---
+FROM eclipse-temurin:21-jdk-jammy AS builder
+WORKDIR /workspace
+
+# Copy Maven wrapper and POM from backend directory
+COPY backend/.mvn/ .mvn/
+COPY backend/mvnw backend/pom.xml ./
+RUN chmod +x ./mvnw && ./mvnw dependency:go-offline -B
+
+# Copy application source code and compile production JAR
+COPY backend/src/ ./src/
+RUN ./mvnw clean package -DskipTests -B
+
+# --- Stage 2: Minimal Production Runtime ---
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+
+# Create a non-root system user and group for security
+RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser
+
+# Create directory for file uploads and set permissions
+RUN mkdir -p /app/uploads/documents && chown -R appuser:appgroup /app
+
+# Copy the fat JAR from the builder stage
+COPY --from=builder /workspace/target/*.jar /app/app.jar
+
+# JVM memory configuration for 512 MB RAM container:
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=40.0 -XX:+ExitOnOutOfMemoryError"
+ENV PORT=8080
+
+EXPOSE 8080
+
+USER appuser
+
+# Production container healthcheck using Actuator
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/actuator/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

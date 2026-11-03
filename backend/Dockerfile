@@ -1,17 +1,49 @@
-FROM maven:3.9-eclipse-temurin-21 AS build
+# ==============================================================================
+# BHP Logistics Fleet Manager - Backend Dockerfile
+# Multi-stage production build for Java 21 & Spring Boot 3
+# Tuned for Voroa Free Nano (512 MB RAM limit)
+# ==============================================================================
 
+# --- Stage 1: Build the Application JAR ---
+FROM eclipse-temurin:21-jdk-jammy AS builder
+WORKDIR /workspace
+
+# Cache Maven wrapper and dependencies first
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN chmod +x ./mvnw && ./mvnw dependency:go-offline -B
+
+# Copy application source code and compile production JAR
+COPY src/ ./src/
+RUN ./mvnw clean package -DskipTests -B
+
+# --- Stage 2: Minimal Production Runtime ---
+FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
-COPY . .
+# Create a non-root system user and group for security
+RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser
 
-RUN mvn -B -DskipTests package
+# Create directory for file uploads and set permissions
+RUN mkdir -p /app/uploads/documents && chown -R appuser:appgroup /app
 
-FROM eclipse-temurin:21-jre
+# Copy the fat JAR from the builder stage
+COPY --from=builder /workspace/target/*.jar /app/app.jar
 
-WORKDIR /app
-
-COPY --from=build /app/target/*.jar app.jar
+# JVM memory configuration for 512 MB RAM container:
+# -XX:+UseContainerSupport: accurately detects cgroup container memory limits
+# -XX:MaxRAMPercentage=75.0: caps heap at ~384 MB, reserving ~128 MB for Metaspace/threads
+# -XX:InitialRAMPercentage=40.0: quick boot heap allocation (~200 MB)
+# -XX:+ExitOnOutOfMemoryError: clean exit on OOM so container orchestrator restarts smoothly
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=40.0 -XX:+ExitOnOutOfMemoryError"
+ENV PORT=8080
 
 EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "java -Dserver.port=${PORT:-8080} -jar app.jar"]
+USER appuser
+
+# Production container healthcheck using Actuator
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/actuator/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

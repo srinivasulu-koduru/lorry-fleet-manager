@@ -60,17 +60,17 @@ public interface MaintenanceRecordRepository extends JpaRepository<MaintenanceRe
             "ORDER BY m.maintenanceDate DESC")
     List<Object[]> findLatestNextServiceDatesByOwner(@Param("owner") User owner);
 
-    @Query("SELECT FUNCTION('MONTH', m.maintenanceDate), COALESCE(SUM(m.cost), 0) " +
+    @Query("SELECT MONTH(m.maintenanceDate), COALESCE(SUM(m.cost), 0) " +
             "FROM MaintenanceRecord m WHERE m.owner = :owner " +
             "AND m.maintenanceDate >= :startDate AND m.maintenanceDate <= :endDate " +
-            "GROUP BY FUNCTION('MONTH', m.maintenanceDate)")
+            "GROUP BY MONTH(m.maintenanceDate)")
     List<Object[]> sumCostByOwnerGroupedByMonth(
             @Param("owner") User owner,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
 
-    @Query("SELECT DISTINCT FUNCTION('YEAR', m.maintenanceDate) FROM MaintenanceRecord m " +
-            "WHERE m.owner = :owner ORDER BY FUNCTION('YEAR', m.maintenanceDate) DESC")
+    @Query("SELECT DISTINCT YEAR(m.maintenanceDate) FROM MaintenanceRecord m " +
+            "WHERE m.owner = :owner ORDER BY YEAR(m.maintenanceDate) DESC")
     List<Integer> findDistinctYearsByOwner(@Param("owner") User owner);
 }

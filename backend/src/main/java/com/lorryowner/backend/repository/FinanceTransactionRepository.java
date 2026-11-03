@@ -47,11 +47,11 @@ public interface FinanceTransactionRepository extends JpaRepository<FinanceTrans
             @Param("endDate") LocalDate endDate
     );
 
-    @Query("SELECT FUNCTION('MONTH', ft.transactionDate), ft.transactionType, COALESCE(SUM(ft.amount), 0) " +
+    @Query("SELECT MONTH(ft.transactionDate), ft.transactionType, COALESCE(SUM(ft.amount), 0) " +
             "FROM FinanceTransaction ft WHERE ft.owner = :owner " +
             "AND ft.transactionDate >= :startDate AND ft.transactionDate <= :endDate " +
             "AND (ft.transactionType = 'EXPENSE' OR (ft.transactionType = 'INCOME' AND ft.paymentStatus = 'RECEIVED')) " +
-            "GROUP BY FUNCTION('MONTH', ft.transactionDate), ft.transactionType")
+            "GROUP BY MONTH(ft.transactionDate), ft.transactionType")
     List<Object[]> sumByOwnerGroupedByMonthAndType(
             @Param("owner") User owner,
             @Param("startDate") LocalDate startDate,
@@ -69,7 +69,7 @@ public interface FinanceTransactionRepository extends JpaRepository<FinanceTrans
             @Param("endDate") LocalDate endDate
     );
 
-    @Query("SELECT DISTINCT FUNCTION('YEAR', ft.transactionDate) FROM FinanceTransaction ft " +
-            "WHERE ft.owner = :owner ORDER BY FUNCTION('YEAR', ft.transactionDate) DESC")
+    @Query("SELECT DISTINCT YEAR(ft.transactionDate) FROM FinanceTransaction ft " +
+            "WHERE ft.owner = :owner ORDER BY YEAR(ft.transactionDate) DESC")
     List<Integer> findDistinctYearsByOwner(@Param("owner") User owner);
 }
