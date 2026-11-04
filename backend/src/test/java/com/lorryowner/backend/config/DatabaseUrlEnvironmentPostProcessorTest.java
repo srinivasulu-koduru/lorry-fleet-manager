@@ -9,6 +9,9 @@ import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -186,5 +189,37 @@ class DatabaseUrlEnvironmentPostProcessorTest {
         assertThat(url.split("connectTimeout=").length - 1).isEqualTo(1);
         assertThat(url.split("socketTimeout=").length - 1).isEqualTo(1);
         assertThat(url.split("loginTimeout=").length - 1).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Outputs early diagnostic log to System.err with host, port, database, sslmode and timeouts without exposing credentials")
+    void testDiagnosticOutputToSystemErr() {
+        ByteArrayOutputStream errCapture = new ByteArrayOutputStream();
+        PrintStream originalErr = System.err;
+        try {
+            System.setErr(new PrintStream(errCapture));
+
+            ConfigurableEnvironment env = new StandardEnvironment();
+            env.getPropertySources().addLast(new MapPropertySource("testEnv", Map.of(
+                    "DATABASE_URL", "postgres://secret_user:SuperSecretPassword123@db-4293d6e4e653.db.getvoroa.com:20201/bhp_logistics_db"
+            )));
+
+            processor.postProcessEnvironment(env, application);
+
+            String errOutput = errCapture.toString(StandardCharsets.UTF_8);
+            assertThat(errOutput)
+                    .contains("PostgreSQL target: host='db-4293d6e4e653.db.getvoroa.com'")
+                    .contains("port=20201")
+                    .contains("database='bhp_logistics_db'")
+                    .contains("sslmode='require'")
+                    .contains("connectTimeout=15s")
+                    .contains("socketTimeout=30s")
+                    .contains("loginTimeout=15s")
+                    .doesNotContain("secret_user")
+                    .doesNotContain("SuperSecretPassword123")
+                    .doesNotContain("postgres://");
+        } finally {
+            System.setErr(originalErr);
+        }
     }
 }

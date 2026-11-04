@@ -65,6 +65,7 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
                 environment.getPropertySources().addFirst(new MapPropertySource(PROPERTY_SOURCE_NAME, properties));
                 log.info("Enhanced existing JDBC DATABASE_URL with required SSL and timeout parameters.");
             }
+            parseAndLogJdbcDiagnostics(normalizedJdbcUrl);
             return;
         }
 
@@ -155,11 +156,69 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
                         host, port, dbName, DEFAULT_CONNECT_TIMEOUT_SECONDS, DEFAULT_SOCKET_TIMEOUT_SECONDS, DEFAULT_LOGIN_TIMEOUT_SECONDS);
 
                 environment.getPropertySources().addFirst(new MapPropertySource(PROPERTY_SOURCE_NAME, properties));
+                logDiagnosticOutput(host, port, dbName, finalJdbcUrl);
 
             } catch (Exception e) {
+                System.err.println("[DatabaseUrlEnvironmentPostProcessor] ERROR: Failed to parse cloud DATABASE_URL: " + e.getMessage());
                 log.warn("Failed to parse cloud DATABASE_URL; falling back to default configuration. Error: {}", e.getMessage());
             }
         }
+    }
+
+    /**
+     * Reliable early-startup diagnostic logging to System.err.
+     * Guarantees output is captured in container runtime logs before Spring logging initializes.
+     * Never logs username, password, or the complete DATABASE_URL.
+     */
+    public static void logDiagnosticOutput(String host, int port, String dbName, String finalJdbcUrl) {
+        String sslMode = extractQueryParam(finalJdbcUrl, "sslmode");
+        String connectTimeout = extractQueryParam(finalJdbcUrl, "connectTimeout");
+        String socketTimeout = extractQueryParam(finalJdbcUrl, "socketTimeout");
+        String loginTimeout = extractQueryParam(finalJdbcUrl, "loginTimeout");
+
+        System.err.printf(
+                "[DatabaseUrlEnvironmentPostProcessor] PostgreSQL target: host='%s', port=%d, database='%s', sslmode='%s', connectTimeout=%ss, socketTimeout=%ss, loginTimeout=%ss%n",
+                host, port, dbName,
+                sslMode != null ? sslMode : "none",
+                connectTimeout != null ? connectTimeout : "none",
+                socketTimeout != null ? socketTimeout : "none",
+                loginTimeout != null ? loginTimeout : "none"
+        );
+    }
+
+    private static void parseAndLogJdbcDiagnostics(String jdbcUrl) {
+        try {
+            String withoutScheme = jdbcUrl.replaceFirst("(?i)^jdbc:postgresql://", "");
+            int qIdx = withoutScheme.indexOf('?');
+            String pathPart = (qIdx != -1) ? withoutScheme.substring(0, qIdx) : withoutScheme;
+            int slashIdx = pathPart.indexOf('/');
+            String hostAndPort = (slashIdx != -1) ? pathPart.substring(0, slashIdx) : pathPart;
+            String dbName = (slashIdx != -1 && slashIdx + 1 < pathPart.length()) ? pathPart.substring(slashIdx + 1) : "";
+            String host = hostAndPort;
+            int port = 5432;
+            int colonIdx = hostAndPort.lastIndexOf(':');
+            if (colonIdx != -1) {
+                host = hostAndPort.substring(0, colonIdx);
+                try {
+                    port = Integer.parseInt(hostAndPort.substring(colonIdx + 1));
+                } catch (NumberFormatException ignored) {}
+            }
+            logDiagnosticOutput(host, port, dbName, jdbcUrl);
+        } catch (Exception ignored) {}
+    }
+
+    public static String extractQueryParam(String jdbcUrl, String paramName) {
+        if (jdbcUrl == null) return null;
+        int qIdx = jdbcUrl.indexOf('?');
+        if (qIdx == -1) return null;
+        String query = jdbcUrl.substring(qIdx + 1);
+        for (String param : query.split("&")) {
+            String[] kv = param.split("=", 2);
+            if (kv[0].trim().equalsIgnoreCase(paramName)) {
+                return kv.length > 1 ? kv[1].trim() : "";
+            }
+        }
+        return null;
     }
 
     /**
