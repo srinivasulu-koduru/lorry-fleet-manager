@@ -34,7 +34,7 @@ RUN mkdir -p /app/uploads/documents && chown -R appuser:appgroup /app
 COPY --from=builder /workspace/target/*.jar /app/app.jar
 
 # JVM memory configuration for 512 MB RAM container:
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=40.0 -XX:+ExitOnOutOfMemoryError"
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=40.0 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError"
 ENV PORT=8080
 
 EXPOSE 8080
