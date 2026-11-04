@@ -41,7 +41,7 @@ class DatabaseUrlEnvironmentPostProcessorTest {
         processor.postProcessEnvironment(env, application);
 
         assertThat(env.getProperty("spring.datasource.url"))
-                .isEqualTo("jdbc:postgresql://voroa-pg.db.cloud:5432/lorry_fleet_prod?sslmode=require&connectTimeout=15&socketTimeout=30");
+                .isEqualTo("jdbc:postgresql://voroa-pg.db.cloud:5432/lorry_fleet_prod?sslmode=require&connectTimeout=15&socketTimeout=30&loginTimeout=15");
         assertThat(env.getProperty("spring.datasource.username")).isEqualTo("voroa_user");
         assertThat(env.getProperty("spring.datasource.password")).isEqualTo("Secret#Pass1");
         assertThat(env.getProperty("spring.datasource.driver-class-name")).isEqualTo("org.postgresql.Driver");
@@ -58,7 +58,7 @@ class DatabaseUrlEnvironmentPostProcessorTest {
         processor.postProcessEnvironment(env, application);
 
         assertThat(env.getProperty("spring.datasource.url"))
-                .isEqualTo("jdbc:postgresql://pg-host:5432/fleet_db?sslmode=verify-full&connectTimeout=15&socketTimeout=30");
+                .isEqualTo("jdbc:postgresql://pg-host:5432/fleet_db?sslmode=verify-full&connectTimeout=15&socketTimeout=30&loginTimeout=15");
         assertThat(env.getProperty("spring.datasource.username")).isEqualTo("voroa_admin");
         assertThat(env.getProperty("spring.datasource.password")).isEqualTo("my_password");
     }
@@ -74,7 +74,7 @@ class DatabaseUrlEnvironmentPostProcessorTest {
         processor.postProcessEnvironment(env, application);
 
         assertThat(env.getProperty("spring.datasource.url"))
-                .isEqualTo("jdbc:postgresql://db.voroa.internal:5432/bhp_logistics_db?sslmode=require&connectTimeout=15&socketTimeout=30");
+                .isEqualTo("jdbc:postgresql://db.voroa.internal:5432/bhp_logistics_db?sslmode=require&connectTimeout=15&socketTimeout=30&loginTimeout=15");
         assertThat(env.getProperty("spring.datasource.username")).isEqualTo("voroa_owner");
         assertThat(env.getProperty("spring.datasource.password")).isEqualTo("P@ss#w:rd!%123");
     }
@@ -90,7 +90,7 @@ class DatabaseUrlEnvironmentPostProcessorTest {
         processor.postProcessEnvironment(env, application);
 
         assertThat(env.getProperty("spring.datasource.url"))
-                .isEqualTo("jdbc:postgresql://host:5432/quoted_db?sslmode=require&connectTimeout=15&socketTimeout=30");
+                .isEqualTo("jdbc:postgresql://host:5432/quoted_db?sslmode=require&connectTimeout=15&socketTimeout=30&loginTimeout=15");
         assertThat(env.getProperty("spring.datasource.username")).isEqualTo("quoted_user");
         assertThat(env.getProperty("spring.datasource.password")).isEqualTo("quoted_pass");
     }
@@ -106,7 +106,7 @@ class DatabaseUrlEnvironmentPostProcessorTest {
         processor.postProcessEnvironment(env, application);
 
         assertThat(env.getProperty("spring.datasource.url"))
-                .isEqualTo("jdbc:postgresql://ep-host.voroa.app:5432/default_port_db?sslmode=require&connectTimeout=15&socketTimeout=30");
+                .isEqualTo("jdbc:postgresql://ep-host.voroa.app:5432/default_port_db?sslmode=require&connectTimeout=15&socketTimeout=30&loginTimeout=15");
     }
 
     @Test
@@ -120,7 +120,7 @@ class DatabaseUrlEnvironmentPostProcessorTest {
         processor.postProcessEnvironment(env, application);
 
         assertThat(env.getProperty("spring.datasource.url"))
-                .isEqualTo("jdbc:postgresql://localhost:5432/already_jdbc_db?sslmode=require&connectTimeout=15&socketTimeout=30");
+                .isEqualTo("jdbc:postgresql://localhost:5432/already_jdbc_db?sslmode=require&connectTimeout=15&socketTimeout=30&loginTimeout=15");
     }
 
     @Test
@@ -134,8 +134,57 @@ class DatabaseUrlEnvironmentPostProcessorTest {
         processor.postProcessEnvironment(env, application);
 
         assertThat(env.getProperty("spring.datasource.url"))
-                .isEqualTo("jdbc:postgresql://localhost:5432/fallback_db?sslmode=require&connectTimeout=15&socketTimeout=30");
+                .isEqualTo("jdbc:postgresql://localhost:5432/fallback_db?sslmode=require&connectTimeout=15&socketTimeout=30&loginTimeout=15");
         assertThat(env.getProperty("spring.datasource.username")).isEqualTo("fallback_user");
         assertThat(env.getProperty("spring.datasource.password")).isEqualTo("pass123");
+    }
+
+    @Test
+    @DisplayName("Preserves existing loginTimeout when supplied by incoming URL without overwriting")
+    void testPreservesExistingLoginTimeout() {
+        ConfigurableEnvironment env = new StandardEnvironment();
+        env.getPropertySources().addLast(new MapPropertySource("testEnv", Map.of(
+                "DATABASE_URL", "postgres://user:pass@db-host:20201/bhp_logistics_db?loginTimeout=25"
+        )));
+
+        processor.postProcessEnvironment(env, application);
+
+        assertThat(env.getProperty("spring.datasource.url"))
+                .isEqualTo("jdbc:postgresql://db-host:20201/bhp_logistics_db?loginTimeout=25&sslmode=require&connectTimeout=15&socketTimeout=30");
+        assertThat(env.getProperty("spring.datasource.url"))
+                .doesNotContain("loginTimeout=15");
+    }
+
+    @Test
+    @DisplayName("Preserves custom SSL mode and timeout parameters when supplied by incoming URL")
+    void testPreservesExistingSslAndTimeoutParameters() {
+        ConfigurableEnvironment env = new StandardEnvironment();
+        env.getPropertySources().addLast(new MapPropertySource("testEnv", Map.of(
+                "DATABASE_URL", "postgresql://user:pass@db-host:20201/bhp_logistics_db?sslmode=verify-full&connectTimeout=20&socketTimeout=45&loginTimeout=25"
+        )));
+
+        processor.postProcessEnvironment(env, application);
+
+        assertThat(env.getProperty("spring.datasource.url"))
+                .isEqualTo("jdbc:postgresql://db-host:20201/bhp_logistics_db?sslmode=verify-full&connectTimeout=20&socketTimeout=45&loginTimeout=25");
+    }
+
+    @Test
+    @DisplayName("Does not duplicate parameters when all required parameters are already present")
+    void testNoDuplicateParametersWhenAllPresent() {
+        ConfigurableEnvironment env = new StandardEnvironment();
+        env.getPropertySources().addLast(new MapPropertySource("testEnv", Map.of(
+                "DATABASE_URL", "postgres://user:pass@db-host:20201/bhp_logistics_db?sslmode=require&connectTimeout=15&socketTimeout=30&loginTimeout=15"
+        )));
+
+        processor.postProcessEnvironment(env, application);
+
+        String url = env.getProperty("spring.datasource.url");
+        assertThat(url).isNotNull();
+        // Count occurrences of each parameter
+        assertThat(url.split("sslmode=").length - 1).isEqualTo(1);
+        assertThat(url.split("connectTimeout=").length - 1).isEqualTo(1);
+        assertThat(url.split("socketTimeout=").length - 1).isEqualTo(1);
+        assertThat(url.split("loginTimeout=").length - 1).isEqualTo(1);
     }
 }

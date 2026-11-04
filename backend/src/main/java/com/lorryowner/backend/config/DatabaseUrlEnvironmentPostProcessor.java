@@ -23,7 +23,7 @@ import java.util.Map;
  * Enforces production reliability:
  * 1. Safe parsing resilient to special characters in passwords (#, @, %, :, !, etc.) without URI.create() flaws.
  * 2. Enforces SSL mode (sslmode=require) for cloud-hosted PostgreSQL instances like Voroa.
- * 3. Enforces finite JDBC connectTimeout (15s) and socketTimeout (30s) to prevent infinite socketRead0 hangs.
+ * 3. Enforces finite JDBC connectTimeout (15s), socketTimeout (30s), and loginTimeout (15s) to prevent infinite socketRead0 hangs.
  * 4. Strips surrounding quotes often injected by cloud environment dashboards.
  * 5. Masks credentials in all log statements to prevent credential leakage.
  */
@@ -34,6 +34,7 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
 
     public static final int DEFAULT_CONNECT_TIMEOUT_SECONDS = 15;
     public static final int DEFAULT_SOCKET_TIMEOUT_SECONDS = 30;
+    public static final int DEFAULT_LOGIN_TIMEOUT_SECONDS = 15;
     public static final String DEFAULT_SSL_MODE = "require";
 
     @Override
@@ -150,8 +151,8 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
                     properties.put("spring.datasource.password", password);
                 }
 
-                log.info("Normalized cloud DATABASE_URL into JDBC format for host '{}:{}' on database '{}' (sslmode=require, connectTimeout={}s, socketTimeout={}s)",
-                        host, port, dbName, DEFAULT_CONNECT_TIMEOUT_SECONDS, DEFAULT_SOCKET_TIMEOUT_SECONDS);
+                log.info("Normalized cloud DATABASE_URL into JDBC format for host '{}:{}' on database '{}' (sslmode=require, connectTimeout={}s, socketTimeout={}s, loginTimeout={}s)",
+                        host, port, dbName, DEFAULT_CONNECT_TIMEOUT_SECONDS, DEFAULT_SOCKET_TIMEOUT_SECONDS, DEFAULT_LOGIN_TIMEOUT_SECONDS);
 
                 environment.getPropertySources().addFirst(new MapPropertySource(PROPERTY_SOURCE_NAME, properties));
 
@@ -162,7 +163,7 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
     }
 
     /**
-     * Ensures that the JDBC URL includes sslmode=require, connectTimeout, and socketTimeout
+     * Ensures that the JDBC URL includes sslmode=require, connectTimeout, socketTimeout, and loginTimeout
      * without overriding explicit query parameters configured by the user.
      */
     public static String normalizeJdbcQueryParams(String jdbcUrl) {
@@ -177,6 +178,7 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
         boolean hasSslMode = false;
         boolean hasConnectTimeout = false;
         boolean hasSocketTimeout = false;
+        boolean hasLoginTimeout = false;
 
         if (StringUtils.hasText(query)) {
             String[] params = query.split("&");
@@ -187,6 +189,7 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
                 if ("sslmode".equalsIgnoreCase(key)) hasSslMode = true;
                 if ("connectTimeout".equalsIgnoreCase(key)) hasConnectTimeout = true;
                 if ("socketTimeout".equalsIgnoreCase(key)) hasSocketTimeout = true;
+                if ("loginTimeout".equalsIgnoreCase(key)) hasLoginTimeout = true;
 
                 if (queryBuilder.length() > 0) queryBuilder.append("&");
                 queryBuilder.append(param);
@@ -204,6 +207,10 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
         if (!hasSocketTimeout) {
             if (queryBuilder.length() > 0) queryBuilder.append("&");
             queryBuilder.append("socketTimeout=").append(DEFAULT_SOCKET_TIMEOUT_SECONDS);
+        }
+        if (!hasLoginTimeout) {
+            if (queryBuilder.length() > 0) queryBuilder.append("&");
+            queryBuilder.append("loginTimeout=").append(DEFAULT_LOGIN_TIMEOUT_SECONDS);
         }
 
         return baseJdbcUrl + "?" + queryBuilder;
