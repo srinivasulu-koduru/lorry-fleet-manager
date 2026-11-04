@@ -21,6 +21,9 @@ RUN ./mvnw clean package -DskipTests -B
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
+# Install curl in runtime stage for reliable container healthchecks
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root system user and group for security
 RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser
 
@@ -42,10 +45,9 @@ EXPOSE 8080
 
 USER appuser
 
-# Production container healthcheck using Actuator and fallback application health endpoint
+# Production container healthcheck using lightweight /api/health endpoint
 # --start-period=90s accommodates Java 21 Spring Boot cold start and SSL connection in constrained containers
 HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=5 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/actuator/health || \
-      wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/api/health || exit 1
+  CMD curl -f http://localhost:${PORT:-8080}/api/health || exit 1
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

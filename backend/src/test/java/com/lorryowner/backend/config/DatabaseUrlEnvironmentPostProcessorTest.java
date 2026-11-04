@@ -3,10 +3,13 @@ package com.lorryowner.backend.config;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.io.support.SpringFactoriesLoader;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,6 +18,17 @@ class DatabaseUrlEnvironmentPostProcessorTest {
 
     private final DatabaseUrlEnvironmentPostProcessor processor = new DatabaseUrlEnvironmentPostProcessor();
     private final SpringApplication application = new SpringApplication();
+
+    @Test
+    @DisplayName("Verifies that DatabaseUrlEnvironmentPostProcessor is registered in META-INF/spring.factories for Spring Boot 3")
+    void testRegisteredInSpringFactories() {
+        List<String> postProcessors = SpringFactoriesLoader.loadFactoryNames(
+                EnvironmentPostProcessor.class,
+                Thread.currentThread().getContextClassLoader()
+        );
+        assertThat(postProcessors)
+                .contains("com.lorryowner.backend.config.DatabaseUrlEnvironmentPostProcessor");
+    }
 
     @Test
     @DisplayName("Normalizes postgres:// standard cloud URL format with user, password, port, and enforces SSL/timeouts")
