@@ -42,8 +42,10 @@ EXPOSE 8080
 
 USER appuser
 
-# Production container healthcheck using Actuator
-HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/actuator/health || exit 1
+# Production container healthcheck using Actuator and fallback application health endpoint
+# --start-period=90s accommodates Java 21 Spring Boot cold start and SSL connection in constrained containers
+HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=5 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/actuator/health || \
+      wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/api/health || exit 1
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

@@ -24,6 +24,9 @@ spring:
       idle-timeout: 30000
       connection-timeout: 20000
       pool-name: LorryOwnerHikariCP
+      data-source-properties:
+        connectTimeout: 15
+        socketTimeout: 30
 
   jpa:
     open-in-view: false
