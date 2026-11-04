@@ -80,3 +80,10 @@ bootstrap:
     password: ${INITIAL_OWNER_PASSWORD:}
     full-name: ${INITIAL_OWNER_FULL_NAME:Fleet Owner}
     phone-number: ${INITIAL_OWNER_PHONE:}
+
+logging:
+  level:
+    com.zaxxer.hikari: DEBUG
+    org.postgresql: DEBUG
+    org.hibernate.engine.jdbc.env.internal: DEBUG
+    org.springframework.boot.autoconfigure.jdbc: DEBUG
