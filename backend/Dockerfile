@@ -38,7 +38,7 @@ COPY --from=builder /workspace/target/*.jar /app/app.jar
 # -XX:MaxRAMPercentage=75.0: caps heap at ~384 MB, reserving ~128 MB for Metaspace/threads
 # -XX:InitialRAMPercentage=40.0: quick boot heap allocation (~200 MB)
 # -XX:+ExitOnOutOfMemoryError: clean exit on OOM so container orchestrator restarts smoothly
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=40.0 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError"
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=40.0 -XX:+UseSerialGC -XX:CICompilerCount=2 -Djava.security.egd=file:/dev/./urandom -XX:+ExitOnOutOfMemoryError"
 ENV PORT=8080
 
 EXPOSE 8080

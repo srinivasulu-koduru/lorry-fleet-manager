@@ -28,6 +28,11 @@ spring:
         connectTimeout: 15
         socketTimeout: 30
 
+  data:
+    jpa:
+      repositories:
+        bootstrap-mode: deferred
+
   jpa:
     open-in-view: false
     hibernate:
