@@ -38,12 +38,13 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAM
 ENV PORT=8080
 
 EXPOSE 8080
+EXPOSE 3000
 
 USER appuser
 
 # Production container healthcheck using lightweight /api/health endpoint
 # --start-period=90s accommodates Java 21 Spring Boot cold start and SSL connection in constrained containers
-HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=5 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=180s --retries=10 \
   CMD curl -f http://localhost:${PORT:-8080}/api/health || exit 1
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

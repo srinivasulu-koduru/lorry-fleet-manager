@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 @SpringBootApplication
 public class LorryOwnerBackendApplication {
 
-    private static final int WATCHDOG_DELAY_SECONDS = 30;
+    private static final int WATCHDOG_DELAY_SECONDS = 180;
 
     public static void main(String[] args) {
         // Start daemon watchdog before SpringApplication.run()
