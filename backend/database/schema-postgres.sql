@@ -184,3 +184,11 @@ CREATE TABLE IF NOT EXISTS vehicle_documents (
 
 CREATE INDEX IF NOT EXISTS idx_vd_lorry ON vehicle_documents(lorry_id);
 CREATE INDEX IF NOT EXISTS idx_vd_uploader ON vehicle_documents(uploaded_by_id);
+
+
+-- 9. System / Application Settings (One-Time Execution Safeguards & Metadata)
+CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

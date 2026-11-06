@@ -78,10 +78,12 @@ jwt:
 # Initial Owner Bootstrap Configuration
 # When backend starts: if no OWNER account exists and credentials are provided,
 # the bootstrap service creates the first owner with BCrypt hashed password.
-# Refuses to overwrite existing owners; does not run if credentials missing.
+# If an owner already exists and OWNER_PASSWORD_RESET_ENABLED=true, a safe one-time
+# password reset executes for INITIAL_OWNER_USERNAME with a persistent safeguard against repeats.
 bootstrap:
   owner:
     username: ${INITIAL_OWNER_USERNAME:}
     password: ${INITIAL_OWNER_PASSWORD:}
     full-name: ${INITIAL_OWNER_FULL_NAME:Fleet Owner}
     phone-number: ${INITIAL_OWNER_PHONE:}
+    password-reset-enabled: ${OWNER_PASSWORD_RESET_ENABLED:false}
