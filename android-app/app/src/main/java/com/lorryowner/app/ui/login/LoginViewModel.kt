@@ -193,8 +193,7 @@ class LoginViewModel(
         }
 
         return lastErrorResult ?: LoginResult.Failure(
-            if (isEmu) "Cannot connect to backend at ${ApiConfig.EMULATOR_BASE_URL}. Ensure Spring Boot is running on port 8080."
-            else "Cannot connect to backend server. Please verify network connectivity."
+            "Cannot connect to backend server. Please check your internet connection."
         )
     }
 
@@ -271,20 +270,10 @@ class LoginViewModel(
             }
         } catch (e: java.net.ConnectException) {
             Log.e(TAG, "Connection refused at $baseUrl: ${e.message}", e)
-            val hint = if (ApiConfig.isEmulator()) {
-                "Cannot connect to backend server at $baseUrl. Ensure Spring Boot is running on port 8080."
-            } else {
-                "Cannot connect to backend server at $baseUrl. Check network connection and ensure backend is running."
-            }
-            LoginResult.Failure(hint)
+            LoginResult.Failure("Cannot connect to backend server. Please check your internet connection.")
         } catch (e: java.net.SocketTimeoutException) {
             Log.e(TAG, "Socket timeout at $baseUrl: ${e.message}", e)
-            val hint = if (ApiConfig.isEmulator()) {
-                "Connection to backend timed out at $baseUrl. Ensure Spring Boot is running and responsive on port 8080."
-            } else {
-                "Connection to backend timed out at $baseUrl. Verify phone and laptop are on the same Wi-Fi network."
-            }
-            LoginResult.Failure(hint)
+            LoginResult.Failure("Connection to backend timed out. Please check your network connection and try again.")
         } catch (e: Exception) {
             Log.e(TAG, "Exception during login at $baseUrl: ${e.message}", e)
             LoginResult.Failure("Authentication request failed at $baseUrl: ${e.localizedMessage ?: "Unknown network error"}")

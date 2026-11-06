@@ -9,21 +9,29 @@ import com.lorryowner.app.security.SessionManager
  * Centralized Backend API & Network URL Configuration.
  *
  * Responsibilities:
- * 1. Environment-aware URL resolution:
- *    - Real physical phones prioritize local LAN Wi-Fi IP (e.g. http://10.231.41.81:8080).
- *    - Android Studio emulators prioritize QEMU router loopback (http://10.0.2.2:8080)
- *      and ADB reverse loopback (http://127.0.0.1:8080).
- * 2. Persistent working URL caching:
+ * 1. Production Backend Priority:
+ *    - Defaults to the live, secure production backend:
+ *      https://bhp-logistics-backend.getvoroa.com
+ *    - Release builds strictly communicate exclusively with production over HTTPS.
+ * 2. Environment-aware candidate URL resolution:
+ *    - In production (release variant), only the production HTTPS endpoint is permitted.
+ *    - In development (debug variant), the production endpoint is prioritized as default,
+ *      while preserving fallback to local LAN or emulator for offline testing.
+ * 3. Persistent working URL caching:
  *    - Once a connection succeeds, the working base URL is saved in secure storage
  *      so subsequent API calls across the entire application connect instantly without discovery latency.
- * 3. Configurable development host:
- *    - Default LAN host/port are injected at build time from build.gradle.kts / BuildConfig,
- *      and can also be customized dynamically at runtime.
  * 4. Consistent URL builder for all application endpoints.
  */
 object ApiConfig {
 
     private const val TAG = "ApiConfig"
+
+    /**
+     * Deployed production backend base URL (Voroa Cloud Platform, TLS secured).
+     */
+    const val PROD_BASE_URL: String = "https://bhp-logistics-backend.getvoroa.com"
+
+    val IS_PRODUCTION: Boolean = BuildConfig.IS_PRODUCTION
 
     val DEFAULT_PORT: Int = BuildConfig.DEV_BACKEND_PORT
     val DEFAULT_DEV_LAN_HOST: String = BuildConfig.DEV_BACKEND_HOST
@@ -58,31 +66,35 @@ object ApiConfig {
     /**
      * Computes candidate base URLs ordered by probability of success for the current environment.
      *
-     * - On an Android Studio emulator:
-     *   1. Custom override URL (if explicitly set by developer in server dialog)
-     *   2. EMULATOR_BASE_URL (http://10.0.2.2:8080, native host mapping)
-     *   3. LOOPBACK_BASE_URL (http://127.0.0.1:8080, if reverse tunnel is active)
-     *   4. DEV_LAN_BASE_URL (http://10.231.41.81:8080, fallback)
+     * - In Production (Release build):
+     *   Strictly uses the production HTTPS backend URL (no emulator, loopback, or cleartext IPs).
      *
-     * - On a real physical phone:
-     *   1. Custom override URL (if set by developer/user)
-     *   2. Last working URL (persisted from previous successful request)
-     *   3. DEV_LAN_BASE_URL (laptop Wi-Fi IPv4 address on the shared network)
-     *   4. LOOPBACK_BASE_URL (http://127.0.0.1:8080, valid if connected via USB with adb reverse)
-     *   5. EMULATOR_BASE_URL (http://10.0.2.2:8080, fallback)
+     * - In Development (Debug build):
+     *   1. Custom override URL (if explicitly configured by developer)
+     *   2. Last working URL (if previously verified)
+     *   3. PROD_BASE_URL (https://bhp-logistics-backend.getvoroa.com)
+     *   4. Local emulator / LAN IP fallbacks (for offline testing)
      */
     fun getCandidateBaseUrls(sessionManager: SessionManager? = null): List<String> {
         val customUrl = sessionManager?.getCustomBaseUrl()
         val lastWorkingUrl = sessionManager?.getLastWorkingBaseUrl()
 
+        if (IS_PRODUCTION) {
+            // Production builds must only talk to production HTTPS backend
+            return listOfNotNull(customUrl, PROD_BASE_URL)
+                .map { formatBaseUrl(it) }
+                .filter { it.isNotBlank() }
+                .distinct()
+        }
+
         val isEmu = isEmulator()
-        Log.d(TAG, "Resolving base URLs: isEmulator=$isEmu, customUrl=$customUrl, lastWorkingUrl=$lastWorkingUrl")
+        Log.d(TAG, "Resolving base URLs: isEmulator=$isEmu, isProduction=$IS_PRODUCTION, customUrl=$customUrl, lastWorkingUrl=$lastWorkingUrl")
 
         val candidates = if (isEmu) {
-            // On emulator: customUrl first, then EMULATOR_BASE_URL (10.0.2.2:8080).
-            // Never prioritize an outdated physical-phone LAN IP over the native QEMU loopback.
             listOfNotNull(
                 customUrl,
+                lastWorkingUrl,
+                PROD_BASE_URL,
                 EMULATOR_BASE_URL,
                 LOOPBACK_BASE_URL,
                 DEV_LAN_BASE_URL
@@ -91,6 +103,7 @@ object ApiConfig {
             listOfNotNull(
                 customUrl,
                 lastWorkingUrl,
+                PROD_BASE_URL,
                 DEV_LAN_BASE_URL,
                 LOOPBACK_BASE_URL,
                 EMULATOR_BASE_URL
@@ -105,7 +118,7 @@ object ApiConfig {
 
     /**
      * Returns the active base URL. If not yet determined by a successful call,
-     * returns the most likely default candidate for the current device.
+     * returns the production URL (or custom override if configured).
      */
     fun getBaseUrl(sessionManager: SessionManager? = null): String {
         val customUrl = sessionManager?.getCustomBaseUrl()
@@ -113,6 +126,11 @@ object ApiConfig {
             val formatted = formatBaseUrl(customUrl)
             activeBaseUrl = formatted
             return formatted
+        }
+
+        if (IS_PRODUCTION) {
+            activeBaseUrl = PROD_BASE_URL
+            return PROD_BASE_URL
         }
 
         activeBaseUrl?.let { return it }
@@ -124,14 +142,16 @@ object ApiConfig {
             return formatted
         }
 
-        if (isEmulator()) {
-            // Emulators reliably connect to host laptop via standard 10.0.2.2:8080 loopback
-            activeBaseUrl = EMULATOR_BASE_URL
-            return EMULATOR_BASE_URL
-        }
+        // Default to production backend
+        activeBaseUrl = PROD_BASE_URL
+        return PROD_BASE_URL
+    }
 
-        activeBaseUrl = DEV_LAN_BASE_URL
-        return DEV_LAN_BASE_URL
+    /**
+     * Returns the base URL guaranteed to end with a trailing slash.
+     */
+    fun getBaseUrlWithTrailingSlash(sessionManager: SessionManager? = null): String {
+        return "${getBaseUrl(sessionManager).removeSuffix("/")}/"
     }
 
     /**
@@ -172,28 +192,35 @@ object ApiConfig {
 
     /**
      * Normalizes a host/URL string into a valid HTTP/HTTPS base URL.
+     * Correctly handles standard HTTPS cloud domains without appending invalid port numbers.
+     *
      * Accepts:
-     * - "10.231.41.81" -> "http://10.231.41.81:8080"
-     * - "10.231.41.81:8080" -> "http://10.231.41.81:8080"
-     * - "http://10.231.41.81:8080/" -> "http://10.231.41.81:8080"
+     * - "https://bhp-logistics-backend.getvoroa.com" -> "https://bhp-logistics-backend.getvoroa.com"
+     * - "bhp-logistics-backend.getvoroa.com" -> "https://bhp-logistics-backend.getvoroa.com"
+     * - "10.0.2.2" -> "http://10.0.2.2:8080"
      */
     fun formatBaseUrl(input: String): String {
         var trimmed = input.trim()
         if (trimmed.isEmpty()) return ""
 
-        // Prepend scheme if missing
+        // Prepend scheme if missing; default to https for internet domains
         if (!trimmed.startsWith("http://", ignoreCase = true) && !trimmed.startsWith("https://", ignoreCase = true)) {
-            trimmed = "http://$trimmed"
+            trimmed = if (trimmed.contains(".com") || trimmed.contains(".app") || trimmed.contains(".io") ||
+                trimmed.contains(".net") || trimmed.contains(".org") || trimmed.contains("getvoroa")) {
+                "https://$trimmed"
+            } else {
+                "http://$trimmed"
+            }
         }
 
         trimmed = trimmed.removeSuffix("/")
 
-        // Check if port is specified after the host
         val scheme = trimmed.substringBefore("://")
         val withoutScheme = trimmed.substringAfter("://")
         val hostPart = withoutScheme.substringBefore("/")
 
-        if (!hostPart.contains(":")) {
+        // Only append default port for HTTP when host has no port and is an IP or local host
+        if (!hostPart.contains(":") && scheme.equals("http", ignoreCase = true)) {
             trimmed = "$scheme://$hostPart:$DEFAULT_PORT"
         }
 

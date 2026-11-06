@@ -479,12 +479,12 @@ fun LoginScreen(
                 text = {
                     Column {
                         Text(
-                            text = if (ApiConfig.isEmulator()) "Environment: Android Studio Emulator" else "Environment: Physical Android Phone",
+                            text = if (ApiConfig.IS_PRODUCTION) "Production Backend Active" else "Environment: ${if (ApiConfig.isEmulator()) "Emulator" else "Physical Device"}",
                             style = MaterialTheme.typography.bodySmall.copy(color = BhpDarkForestGreen, fontWeight = FontWeight.SemiBold)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Default for this device: ${if (ApiConfig.isEmulator()) ApiConfig.EMULATOR_BASE_URL else ApiConfig.DEV_LAN_BASE_URL}",
+                            text = "Production URL: ${ApiConfig.PROD_BASE_URL}",
                             style = MaterialTheme.typography.bodySmall.copy(color = BhpTextMuted)
                         )
                         Spacer(modifier = Modifier.height(14.dp))
@@ -492,7 +492,7 @@ fun LoginScreen(
                             value = uiState.serverUrlInput,
                             onValueChange = { viewModel.onServerUrlInputChanged(it) },
                             label = { Text("Server URL or IP", color = BhpTextMuted) },
-                            placeholder = { Text("http://10.231.41.81:8080", color = BhpTextMuted) },
+                            placeholder = { Text(ApiConfig.PROD_BASE_URL, color = BhpTextMuted) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = BhpTextBlack,

@@ -31,6 +31,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        buildConfigField("String", "PROD_BACKEND_URL", "\"https://bhp-logistics-backend.getvoroa.com/\"")
         buildConfigField("String", "DEV_BACKEND_HOST", "\"$devBackendHost\"")
         buildConfigField("int", "DEV_BACKEND_PORT", "$devBackendPort")
         val mapsApiKey = localProps.getProperty("maps.api.key") ?: ""
@@ -40,10 +41,16 @@ android {
 
     buildTypes {
         release {
+            buildConfigField("String", "BACKEND_BASE_URL", "\"https://bhp-logistics-backend.getvoroa.com/\"")
+            buildConfigField("boolean", "IS_PRODUCTION", "true")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
+        }
+        debug {
+            buildConfigField("String", "BACKEND_BASE_URL", "\"https://bhp-logistics-backend.getvoroa.com/\"")
+            buildConfigField("boolean", "IS_PRODUCTION", "false")
         }
     }
     compileOptions {
