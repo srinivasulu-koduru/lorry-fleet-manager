@@ -38,7 +38,6 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAM
 ENV PORT=8080
 
 EXPOSE 8080
-EXPOSE 3000
 
 USER appuser
 
