@@ -49,6 +49,10 @@ class OwnerBootstrapServiceTest {
         bootstrapService = new OwnerBootstrapService(userRepository, passwordEncoder, jdbcTemplate);
     }
 
+    // =========================================================================
+    // INITIAL OWNER CREATION & PASSWORD RESET TESTS
+    // =========================================================================
+
     @Test
     @DisplayName("Creates initial Owner account when database is empty and credentials are provided")
     void run_whenEmptyDatabaseAndCredentialsProvided_createsOwnerAccount() {
@@ -316,5 +320,141 @@ class OwnerBootstrapServiceTest {
 
         User afterSecond = userRepository.findByUsername("bhp_owner").orElseThrow();
         assertThat(passwordEncoder.matches("SecondDistinctPass456!", afterSecond.getPasswordHash())).isTrue();
+    }
+
+    // =========================================================================
+    // SECOND OWNER PROVISIONING TESTS
+    // =========================================================================
+
+    @Test
+    @DisplayName("Successfully creates second Owner account when credentials are provided")
+    void run_whenSecondOwnerCredentialsProvided_createsSecondOwnerSuccessfully() {
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerUsername", "owner_partner");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPassword", "PartnerPass123!");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerFullName", "Managing Partner");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPhoneNumber", "9876543222");
+
+        bootstrapService.run(null);
+
+        Optional<User> secondOwnerOpt = userRepository.findByUsername("owner_partner");
+        assertThat(secondOwnerOpt).isPresent();
+        User secondOwner = secondOwnerOpt.get();
+        assertThat(secondOwner.getRole()).isEqualTo(Role.OWNER);
+        assertThat(secondOwner.getFullName()).isEqualTo("Managing Partner");
+        assertThat(secondOwner.getPhoneNumber()).isEqualTo("9876543222");
+        assertThat(secondOwner.isActive()).isTrue();
+        assertThat(secondOwner.getPasswordHash()).isNotEqualTo("PartnerPass123!");
+        assertThat(passwordEncoder.matches("PartnerPass123!", secondOwner.getPasswordHash())).isTrue();
+    }
+
+    @Test
+    @DisplayName("Creates both initial and second owner accounts when both are provided on clean database")
+    void run_whenBothInitialAndSecondOwnerProvided_createsBothAccountsSuccessfully() {
+        // Initial Owner
+        ReflectionTestUtils.setField(bootstrapService, "bootstrapUsername", "bhp_owner");
+        ReflectionTestUtils.setField(bootstrapService, "bootstrapPassword", "InitialPass123!");
+        ReflectionTestUtils.setField(bootstrapService, "bootstrapFullName", "Primary Owner");
+
+        // Second Owner
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerUsername", "second_owner");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPassword", "SecondPass123!");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerFullName", "Co-Owner");
+
+        bootstrapService.run(null);
+
+        assertThat(userRepository.count()).isEqualTo(2);
+
+        User primary = userRepository.findByUsername("bhp_owner").orElseThrow();
+        assertThat(primary.getRole()).isEqualTo(Role.OWNER);
+        assertThat(passwordEncoder.matches("InitialPass123!", primary.getPasswordHash())).isTrue();
+
+        User secondary = userRepository.findByUsername("second_owner").orElseThrow();
+        assertThat(secondary.getRole()).isEqualTo(Role.OWNER);
+        assertThat(passwordEncoder.matches("SecondPass123!", secondary.getPasswordHash())).isTrue();
+    }
+
+    @Test
+    @DisplayName("Skips second owner creation when username or password is blank or missing")
+    void run_whenSecondOwnerCredentialsMissing_skipsSecondOwnerCreation() {
+        // 1. Username provided, password blank
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerUsername", "second_owner");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPassword", "");
+        bootstrapService.run(null);
+        assertThat(userRepository.findByUsername("second_owner")).isEmpty();
+
+        // 2. Password provided, username blank
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerUsername", "");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPassword", "SecondPass123!");
+        bootstrapService.run(null);
+        assertThat(userRepository.count()).isEqualTo(0);
+
+        // 3. Both null/empty
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerUsername", null);
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPassword", null);
+        bootstrapService.run(null);
+        assertThat(userRepository.count()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Aborts second owner creation when password is shorter than 8 characters")
+    void run_whenSecondOwnerPasswordTooShort_abortsSecondOwnerCreation() {
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerUsername", "short_pass_second");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPassword", "short");
+
+        bootstrapService.run(null);
+
+        assertThat(userRepository.findByUsername("short_pass_second")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Skips creation and never modifies existing account when second owner username already exists")
+    void run_whenSecondOwnerUsernameAlreadyExists_skipsCreationWithoutModifyingExisting() {
+        // Pre-create an existing user with username "co_owner"
+        User existing = new User(
+                "co_owner",
+                passwordEncoder.encode("OriginalPass123!"),
+                Role.OWNER,
+                "Original Co-Owner",
+                "9998887776",
+                null
+        );
+        userRepository.save(existing);
+
+        // Attempt second owner creation with same username but different password
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerUsername", "co_owner");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPassword", "NewHackerPassword123!");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerFullName", "Imposter");
+
+        bootstrapService.run(null);
+
+        // Verify account details and password remain unchanged
+        User fetched = userRepository.findByUsername("co_owner").orElseThrow();
+        assertThat(passwordEncoder.matches("OriginalPass123!", fetched.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches("NewHackerPassword123!", fetched.getPasswordHash())).isFalse();
+        assertThat(fetched.getFullName()).isEqualTo("Original Co-Owner");
+        assertThat(userRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Repeated startup does not duplicate or modify second owner account")
+    void run_repeatedStartup_doesNotDuplicateOrModifySecondOwner() {
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerUsername", "second_owner");
+        ReflectionTestUtils.setField(bootstrapService, "secondOwnerPassword", "SecondPass123!");
+
+        // 1. First run creates the account
+        bootstrapService.run(null);
+        assertThat(userRepository.count()).isEqualTo(1);
+
+        User firstCreated = userRepository.findByUsername("second_owner").orElseThrow();
+        Instant firstUpdatedAt = firstCreated.getUpdatedAt();
+
+        // 2. Second run (simulating application restart)
+        bootstrapService.run(null);
+
+        // Total count must remain 1
+        assertThat(userRepository.count()).isEqualTo(1);
+        User secondFetch = userRepository.findByUsername("second_owner").orElseThrow();
+        assertThat(secondFetch.getUpdatedAt()).isEqualTo(firstUpdatedAt);
+        assertThat(passwordEncoder.matches("SecondPass123!", secondFetch.getPasswordHash())).isTrue();
     }
 }

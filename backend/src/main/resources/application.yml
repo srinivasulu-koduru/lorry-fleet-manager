@@ -87,3 +87,8 @@ bootstrap:
     full-name: ${INITIAL_OWNER_FULL_NAME:Fleet Owner}
     phone-number: ${INITIAL_OWNER_PHONE:}
     password-reset-enabled: ${OWNER_PASSWORD_RESET_ENABLED:false}
+  second-owner:
+    username: ${SECOND_OWNER_USERNAME:}
+    password: ${SECOND_OWNER_PASSWORD:}
+    full-name: ${SECOND_OWNER_FULL_NAME:Second Fleet Owner}
+    phone-number: ${SECOND_OWNER_PHONE:}

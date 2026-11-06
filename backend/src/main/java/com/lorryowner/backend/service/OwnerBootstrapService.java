@@ -28,7 +28,7 @@ import java.util.Optional;
 import java.util.Properties;
 
 /**
- * Secure Initial Owner Account Provisioning and One-Time Password Reset Service.
+ * Secure Initial Owner Account Provisioning, Password Reset, and Second Owner Provisioning Service.
  *
  * Requirements enforced:
  * 1. Supports INITIAL_OWNER_USERNAME and INITIAL_OWNER_PASSWORD environment variables.
@@ -41,7 +41,10 @@ import java.util.Properties;
  * 5. When password reset succeeds, a persistent safeguard (dual-layer: database app_settings table
  *    and upload directory marker) guarantees that subsequent application restarts cannot
  *    accidentally reset or overwrite the owner password repeatedly.
- * 6. Never logs plaintext passwords or exposes sensitive credentials through any API.
+ * 6. Supports SECOND_OWNER_USERNAME, SECOND_OWNER_PASSWORD, SECOND_OWNER_FULL_NAME, and
+ *    SECOND_OWNER_PHONE to automatically provision a second OWNER account on startup.
+ *    If the username already exists, skips creation without modifying existing accounts or credentials.
+ * 7. Never logs plaintext passwords or exposes sensitive credentials through any API.
  */
 @Service
 public class OwnerBootstrapService implements ApplicationRunner {
@@ -67,6 +70,18 @@ public class OwnerBootstrapService implements ApplicationRunner {
 
     @Value("${bootstrap.owner.password-reset-enabled:false}")
     private boolean passwordResetEnabled;
+
+    @Value("${bootstrap.second-owner.username:}")
+    private String secondOwnerUsername;
+
+    @Value("${bootstrap.second-owner.password:}")
+    private String secondOwnerPassword;
+
+    @Value("${bootstrap.second-owner.full-name:Second Fleet Owner}")
+    private String secondOwnerFullName;
+
+    @Value("${bootstrap.second-owner.phone-number:}")
+    private String secondOwnerPhoneNumber;
 
     @Value("${app.document.upload-dir:uploads/documents}")
     private String uploadDir;
@@ -98,6 +113,8 @@ public class OwnerBootstrapService implements ApplicationRunner {
         } else {
             handleExistingOwnerScenario();
         }
+
+        handleSecondOwnerCreation();
     }
 
     /**
@@ -122,12 +139,19 @@ public class OwnerBootstrapService implements ApplicationRunner {
             return;
         }
 
+        String fullName = bootstrapFullName != null && !bootstrapFullName.trim().isEmpty()
+                ? bootstrapFullName.trim()
+                : "Fleet Owner";
+        String phone = bootstrapPhoneNumber != null && !bootstrapPhoneNumber.trim().isEmpty()
+                ? bootstrapPhoneNumber.trim()
+                : null;
+
         User owner = new User(
                 username,
                 passwordEncoder.encode(password),
                 Role.OWNER,
-                bootstrapFullName.trim().isEmpty() ? "Fleet Owner" : bootstrapFullName.trim(),
-                bootstrapPhoneNumber.trim().isEmpty() ? null : bootstrapPhoneNumber.trim(),
+                fullName,
+                phone,
                 null
         );
 
@@ -204,6 +228,58 @@ public class OwnerBootstrapService implements ApplicationRunner {
         log.info("Password hashed with BCrypt. password_updated_at refreshed (invalidates older JWTs).");
         log.info("Persistent safeguard recorded. Repeated execution on future restarts is blocked.");
         log.info("Action Required: Set OWNER_PASSWORD_RESET_ENABLED=false in Voroa environment variables.");
+        log.info("================================================================================");
+    }
+
+    /**
+     * Provisions a second Owner account if SECOND_OWNER_USERNAME and SECOND_OWNER_PASSWORD are provided.
+     * Skips safely without modifying existing accounts if the username already exists.
+     */
+    private void handleSecondOwnerCreation() {
+        String username = secondOwnerUsername != null ? secondOwnerUsername.trim() : "";
+        String password = secondOwnerPassword != null ? secondOwnerPassword.trim() : "";
+
+        // If credentials are not supplied, skip silently
+        if (username.isEmpty() || password.isEmpty()) {
+            return;
+        }
+
+        // Validate password length
+        if (password.length() < 8) {
+            log.error("SECOND_OWNER_PASSWORD must be at least 8 characters long. Second owner creation aborted.");
+            return;
+        }
+
+        // Check if username already exists in database (owner, driver, etc.)
+        if (userRepository.existsByUsername(username)) {
+            log.info("Second owner account '{}' already exists in database. Skipping second owner creation.", username);
+            return;
+        }
+
+        // Create second Owner account with BCrypt password hashing
+        String fullName = secondOwnerFullName != null && !secondOwnerFullName.trim().isEmpty()
+                ? secondOwnerFullName.trim()
+                : "Second Fleet Owner";
+        String phone = secondOwnerPhoneNumber != null && !secondOwnerPhoneNumber.trim().isEmpty()
+                ? secondOwnerPhoneNumber.trim()
+                : null;
+
+        User secondOwner = new User(
+                username,
+                passwordEncoder.encode(password),
+                Role.OWNER,
+                fullName,
+                phone,
+                null
+        );
+        secondOwner.setActive(true);
+
+        userRepository.save(secondOwner);
+
+        log.info("================================================================================");
+        log.info("SECOND OWNER ACCOUNT PROVISIONED SUCCESSFULLY:");
+        log.info("Username: '{}' | Role: OWNER", username);
+        log.info("Password was hashed with BCrypt. Plaintext credentials were not stored or logged.");
         log.info("================================================================================");
     }
 
