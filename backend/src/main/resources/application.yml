@@ -22,7 +22,7 @@ spring:
       maximum-pool-size: 3
       minimum-idle: 1
       idle-timeout: 30000
-      connection-timeout: 20000
+      connection-timeout: 30000
       pool-name: LorryOwnerHikariCP
       data-source-properties:
         connectTimeout: 15
@@ -42,6 +42,7 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false
         show_sql: false
 
