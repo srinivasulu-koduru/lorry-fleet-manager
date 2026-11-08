@@ -3,6 +3,7 @@ package com.lorryowner.backend.service;
 import com.lorryowner.backend.dto.trip.TripCreateDto;
 import com.lorryowner.backend.dto.trip.TripResponseDto;
 import com.lorryowner.backend.entity.*;
+import com.lorryowner.backend.repository.FinanceTransactionRepository;
 import com.lorryowner.backend.repository.LorryRepository;
 import com.lorryowner.backend.repository.TripRepository;
 import com.lorryowner.backend.repository.UserRepository;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.*;
 import java.util.List;
 
@@ -26,21 +28,24 @@ public class OwnerTripService {
     private final TripRepository tripRepository;
     private final LorryRepository lorryRepository;
     private final UserRepository userRepository;
+    private final FinanceTransactionRepository financeTransactionRepository;
 
     public OwnerTripService(
             TripRepository tripRepository,
             LorryRepository lorryRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            FinanceTransactionRepository financeTransactionRepository
     ) {
         this.tripRepository = tripRepository;
         this.lorryRepository = lorryRepository;
         this.userRepository = userRepository;
+        this.financeTransactionRepository = financeTransactionRepository;
     }
 
     /**
      * Creates a new planned trip for the authenticated fleet owner.
      * Validates owner authorization, lorry and driver ownership, eligibility,
-     * chronological timestamp coherence, and status transitions.
+     * availability (concurrency check against active trips), and amount.
      */
     public TripResponseDto createTrip(TripCreateDto request, String ownerUsername) {
         User owner = resolveAndValidateOwner(ownerUsername);
@@ -56,6 +61,11 @@ public class OwnerTripService {
             log.warn("Security violation: Owner '{}' attempted to create trip on lorry ID={} belonging to owner ID={}",
                     ownerUsername, lorry.getId(), lorry.getOwner().getId());
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cross-owner access denied: Lorry does not belong to the authenticated owner");
+        }
+
+        // Concurrency check: Ensure lorry is not already assigned to an active in-progress trip
+        if (tripRepository.existsByLorryAndTripStatusIn(lorry, List.of(TripStatus.IN_PROGRESS))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This lorry is already assigned to an active trip. Please select another lorry.");
         }
 
         // 2. Validate and resolve Driver
@@ -77,6 +87,11 @@ public class OwnerTripService {
 
         if (!driver.isActive()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected driver account is inactive or decommissioned");
+        }
+
+        // Concurrency check: Ensure driver is not already assigned to an active in-progress trip
+        if (tripRepository.existsByDriverAndTripStatusIn(driver, List.of(TripStatus.IN_PROGRESS))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This driver is already assigned to an active trip. Please select another driver.");
         }
 
         // 3. Validate Origin & Destination
@@ -133,11 +148,17 @@ public class OwnerTripService {
                 ? request.remarks().trim()
                 : null;
 
-        // 6. Generate Unique Trip Reference
+        // 6. Validate Trip Amount (must be non-negative)
+        BigDecimal tripAmount = request.tripAmount() != null ? request.tripAmount() : BigDecimal.ZERO;
+        if (tripAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trip amount must be non-negative");
+        }
+
+        // 7. Generate Unique Trip Reference
         int currentYear = request.plannedDepartureDate().getYear();
         String tripReference = generateTripReference(currentYear);
 
-        // 7. Persist New Trip (Initial status: PLANNED)
+        // 8. Persist New Trip (Initial status: PLANNED)
         Trip trip = new Trip();
         trip.setTripReference(tripReference);
         trip.setOwner(owner);
@@ -151,12 +172,141 @@ public class OwnerTripService {
         trip.setPlannedDeliveryTime(deliveryInstant);
         trip.setLoadType(cleanLoadType);
         trip.setDeliveryNotes(cleanRemarks);
+        trip.setTripAmount(tripAmount);
 
         Trip savedTrip = tripRepository.save(trip);
-        log.info("Trip created successfully: ID={} Reference='{}' Lorry='{}' Driver='{}' Status=PLANNED by Owner='{}'",
-                savedTrip.getId(), savedTrip.getTripReference(), lorry.getRegistrationNumber(), driver.getUsername(), ownerUsername);
+        log.info("Trip created successfully: ID={} Reference='{}' Lorry='{}' Driver='{}' Amount={} Status=PLANNED by Owner='{}'",
+                savedTrip.getId(), savedTrip.getTripReference(), lorry.getRegistrationNumber(), driver.getUsername(), tripAmount, ownerUsername);
 
         return mapToResponseDto(savedTrip, request);
+    }
+
+    /**
+     * Starts an assigned planned trip on behalf of the owner.
+     * Transitions trip lifecycle from PLANNED to IN_PROGRESS.
+     */
+    public TripResponseDto startTrip(Long tripId, String ownerUsername) {
+        User owner = resolveAndValidateOwner(ownerUsername);
+
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Trip not found with ID: " + tripId));
+
+        if (trip.getOwner() != null && !trip.getOwner().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Trip belongs to another fleet owner");
+        }
+
+        if (trip.getTripStatus() == TripStatus.IN_PROGRESS) {
+            return mapToResponseDto(trip, null);
+        }
+        if (trip.getTripStatus() != TripStatus.PLANNED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot start trip with status: " + trip.getTripStatus());
+        }
+
+        // Concurrency safeguard
+        if (trip.getLorry() != null && tripRepository.existsByLorryAndTripStatusIn(trip.getLorry(), List.of(TripStatus.IN_PROGRESS))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This lorry is already assigned to an active trip. Please select another lorry.");
+        }
+        if (trip.getDriver() != null && tripRepository.existsByDriverAndTripStatusIn(trip.getDriver(), List.of(TripStatus.IN_PROGRESS))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This driver is already assigned to an active trip. Please select another driver.");
+        }
+
+        trip.setTripStatus(TripStatus.IN_PROGRESS);
+        if (trip.getStartTime() == null) {
+            trip.setStartTime(Instant.now());
+        }
+
+        if (trip.getLorry() != null) {
+            Lorry lorry = trip.getLorry();
+            lorry.setOperationalStatus(OperationalStatus.ON_TRIP);
+            lorryRepository.save(lorry);
+        }
+
+        Trip saved = tripRepository.save(trip);
+        log.info("Owner '{}' started trip ID={} (ref: {}). Lorry set to ON_TRIP.",
+                ownerUsername, saved.getId(), saved.getTripReference());
+
+        return mapToResponseDto(saved, null);
+    }
+
+    /**
+     * Completes an in-progress trip on behalf of the owner.
+     * Transitions trip lifecycle from IN_PROGRESS to COMPLETED, releases lorry, and records revenue.
+     */
+    public TripResponseDto completeTrip(Long tripId, String notes, String ownerUsername) {
+        User owner = resolveAndValidateOwner(ownerUsername);
+
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Trip not found with ID: " + tripId));
+
+        if (trip.getOwner() != null && !trip.getOwner().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Trip belongs to another fleet owner");
+        }
+
+        if (trip.getTripStatus() == TripStatus.COMPLETED) {
+            return mapToResponseDto(trip, null);
+        }
+        if (trip.getTripStatus() != TripStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trip is not in IN_PROGRESS status (current: " + trip.getTripStatus() + ")");
+        }
+
+        trip.setTripStatus(TripStatus.COMPLETED);
+        trip.setEndTime(Instant.now());
+
+        if (notes != null && !notes.trim().isBlank()) {
+            String cleanNotes = notes.trim();
+            String existingNotes = trip.getDeliveryNotes();
+            if (existingNotes != null && !existingNotes.isBlank()) {
+                trip.setDeliveryNotes(existingNotes + "\n[Completion Note]: " + cleanNotes);
+            } else {
+                trip.setDeliveryNotes("[Completion Note]: " + cleanNotes);
+            }
+        }
+
+        Trip saved = tripRepository.saveAndFlush(trip);
+
+        // Release lorry back to AVAILABLE if no other trips in progress for this lorry
+        if (saved.getLorry() != null) {
+            Lorry lorry = saved.getLorry();
+            boolean hasOtherInProgress = tripRepository.existsByLorryAndTripStatusIn(lorry, List.of(TripStatus.IN_PROGRESS));
+            if (!hasOtherInProgress) {
+                lorry.setOperationalStatus(OperationalStatus.AVAILABLE);
+                lorryRepository.save(lorry);
+            }
+        }
+
+        // Record trip income in finance module if amount > 0 and not already recorded
+        recordTripIncomeIfApplicable(saved);
+
+        log.info("Owner '{}' completed trip ID={} (ref: {}). Lorry released to AVAILABLE.",
+                ownerUsername, saved.getId(), saved.getTripReference());
+
+        return mapToResponseDto(saved, null);
+    }
+
+    /**
+     * Records trip amount as income in finance transactions if not already recorded.
+     */
+    private void recordTripIncomeIfApplicable(Trip trip) {
+        if (trip.getTripAmount() != null && trip.getTripAmount().compareTo(BigDecimal.ZERO) > 0) {
+            if (!financeTransactionRepository.existsByTripAndTransactionType(trip, "INCOME")) {
+                FinanceTransaction ft = new FinanceTransaction(
+                        trip.getOwner(),
+                        trip.getLorry(),
+                        trip,
+                        "INCOME",
+                        "FREIGHT",
+                        "Freight revenue for completed trip " + trip.getTripReference(),
+                        trip.getTripAmount(),
+                        trip.getTripDate() != null ? trip.getTripDate() : LocalDate.now(),
+                        "RECEIVED",
+                        "BANK_TRANSFER",
+                        trip.getTripReference()
+                );
+                financeTransactionRepository.save(ft);
+                log.info("Recorded trip income of ₹{} for completed trip '{}'",
+                        trip.getTripAmount(), trip.getTripReference());
+            }
+        }
     }
 
     /**
@@ -261,6 +411,8 @@ public class OwnerTripService {
             delTime = request.plannedDeliveryTime();
         }
 
+        BigDecimal amount = trip.getTripAmount() != null ? trip.getTripAmount() : BigDecimal.ZERO;
+
         return new TripResponseDto(
                 trip.getId(),
                 trip.getTripReference(),
@@ -278,7 +430,8 @@ public class OwnerTripService {
                 trip.getLoadType(),
                 trip.getDeliveryNotes(),
                 trip.getTripStatus() != null ? trip.getTripStatus().name() : "PLANNED",
-                trip.getCreatedAt() != null ? trip.getCreatedAt() : Instant.now()
+                trip.getCreatedAt() != null ? trip.getCreatedAt() : Instant.now(),
+                amount
         );
     }
 }

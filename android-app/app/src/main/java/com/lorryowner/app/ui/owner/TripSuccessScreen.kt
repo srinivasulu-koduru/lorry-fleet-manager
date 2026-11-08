@@ -372,6 +372,42 @@ fun TripSuccessScreen(
 
                     HorizontalDivider(color = BhpCardBorder.copy(alpha = 0.6f), thickness = 0.8.dp)
 
+                    // Trip Amount Row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(BhpRunningGreenBg)
+                        ) {
+                            FinanceTrendingIcon(tint = BhpRunningGreen, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Trip Revenue Amount",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = BhpTextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            )
+                            Text(
+                                text = createdTrip.tripAmountFormatted,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = BhpRunningGreen,
+                                    fontSize = 14.sp
+                                )
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = BhpCardBorder.copy(alpha = 0.6f), thickness = 0.8.dp)
+
                     // Cargo Type Row
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

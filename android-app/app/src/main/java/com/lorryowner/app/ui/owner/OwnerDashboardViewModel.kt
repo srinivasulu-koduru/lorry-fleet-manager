@@ -21,23 +21,23 @@ import java.time.LocalTime
 import java.util.Locale
 
 data class FleetOverviewState(
-    val runningNow: Long = 3,
-    val readyToStart: Long = 1,
-    val notReady: Long = 1,
-    val totalLorries: Long = 5
+    val runningNow: Long = 0,
+    val readyToStart: Long = 0,
+    val notReady: Long = 0,
+    val totalLorries: Long = 0
 )
 
 data class FinancialSummaryState(
     val monthLabel: String = "This month",
-    val isSample: Boolean = true,
-    val totalTrips: String = "48",
-    val totalTripsTrend: String = "↑ 12%",
-    val income: String = "₹2,45,000",
-    val incomeTrend: String = "↑ 15%",
-    val expenses: String = "₹1,75,000",
-    val expensesTrend: String = "↑ 8%",
-    val profit: String = "₹70,000",
-    val profitTrend: String = "↑ 18%"
+    val isSample: Boolean = false,
+    val totalTrips: String = "0",
+    val totalTripsTrend: String = "—",
+    val income: String = "₹0",
+    val incomeTrend: String = "—",
+    val expenses: String = "₹0",
+    val expensesTrend: String = "—",
+    val profit: String = "₹0",
+    val profitTrend: String = "—"
 )
 
 data class ActivityItemState(
@@ -109,6 +109,7 @@ class OwnerDashboardViewModel(
     }
 
     fun loadDashboard() {
+        if (uiState.isLoading || uiState.isRefreshing) return
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, errorMessage = null)
             val result = withContext(Dispatchers.IO) {
@@ -127,6 +128,7 @@ class OwnerDashboardViewModel(
     }
 
     fun refreshDashboard() {
+        if (uiState.isLoading || uiState.isRefreshing) return
         updateGreeting()
         viewModelScope.launch {
             uiState = uiState.copy(isRefreshing = true)
@@ -197,19 +199,19 @@ class OwnerDashboardViewModel(
 
                 // Fleet overview counts
                 val fleetObj = json.optJSONObject("fleetOverview")
-                val runningNow = fleetObj?.optLong("runningNow", 3L) ?: 3L
-                val readyToStart = fleetObj?.optLong("readyToStart", 1L) ?: 1L
-                val notReady = fleetObj?.optLong("notReady", 1L) ?: 1L
-                val totalLorries = fleetObj?.optLong("totalLorries", 5L) ?: 5L
+                val runningNow = fleetObj?.optLong("runningNow", 0L) ?: 0L
+                val readyToStart = fleetObj?.optLong("readyToStart", 0L) ?: 0L
+                val notReady = fleetObj?.optLong("notReady", 0L) ?: 0L
+                val totalLorries = fleetObj?.optLong("totalLorries", 0L) ?: 0L
 
                 // Financial summary
                 val finObj = json.optJSONObject("financialSummary")
                 val monthLabel = finObj?.optString("monthLabel", "This month") ?: "This month"
-                val isSample = finObj?.optBoolean("isSample", true) ?: true
-                val incomeVal = finObj?.optDouble("income", 245000.0) ?: 245000.0
-                val expenseVal = finObj?.optDouble("expenses", 175000.0) ?: 175000.0
-                val profitVal = finObj?.optDouble("profit", 70000.0) ?: 70000.0
-                val totalTripsVal = finObj?.optLong("totalTrips", 48L) ?: 48L
+                val isSample = finObj?.optBoolean("isSample", false) ?: false
+                val incomeVal = finObj?.optDouble("income", 0.0) ?: 0.0
+                val expenseVal = finObj?.optDouble("expenses", 0.0) ?: 0.0
+                val profitVal = finObj?.optDouble("profit", 0.0) ?: 0.0
+                val totalTripsVal = finObj?.optLong("totalTrips", 0L) ?: 0L
 
                 // Recent activities
                 val activitiesList = mutableListOf<ActivityItemState>()

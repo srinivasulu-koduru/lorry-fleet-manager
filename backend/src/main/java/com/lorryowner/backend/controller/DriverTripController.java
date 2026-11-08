@@ -47,15 +47,18 @@ public class DriverTripController {
     private final UserRepository userRepository;
     private final TripRepository tripRepository;
     private final LorryRepository lorryRepository;
+    private final com.lorryowner.backend.repository.FinanceTransactionRepository financeTransactionRepository;
 
     public DriverTripController(
             UserRepository userRepository,
             TripRepository tripRepository,
-            LorryRepository lorryRepository
+            LorryRepository lorryRepository,
+            com.lorryowner.backend.repository.FinanceTransactionRepository financeTransactionRepository
     ) {
         this.userRepository = userRepository;
         this.tripRepository = tripRepository;
         this.lorryRepository = lorryRepository;
+        this.financeTransactionRepository = financeTransactionRepository;
     }
 
     /**
@@ -222,7 +225,7 @@ public class DriverTripController {
         // Concurrency safeguard: ensure driver doesn't have another simultaneous IN_PROGRESS trip
         boolean hasOtherActive = tripRepository.existsByDriverAndTripStatusIn(driver, List.of(TripStatus.IN_PROGRESS));
         if (hasOtherActive) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have an active trip in progress. Please complete that trip before starting another.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This driver is already assigned to an active trip. Please select another driver.");
         }
 
         // Perform transition
@@ -300,9 +303,11 @@ public class DriverTripController {
             }
         }
 
+        Trip saved = tripRepository.saveAndFlush(trip);
+
         // Release lorry back to AVAILABLE if no other trips in progress for this lorry
-        if (trip.getLorry() != null) {
-            Lorry lorry = trip.getLorry();
+        if (saved.getLorry() != null) {
+            Lorry lorry = saved.getLorry();
             boolean hasOtherInProgress = tripRepository.existsByLorryAndTripStatusIn(lorry, List.of(TripStatus.IN_PROGRESS));
             if (!hasOtherInProgress) {
                 lorry.setOperationalStatus(OperationalStatus.AVAILABLE);
@@ -310,7 +315,28 @@ public class DriverTripController {
             }
         }
 
-        Trip saved = tripRepository.save(trip);
+        // Record trip income in finance module if amount > 0 and not already recorded
+        if (saved.getTripAmount() != null && saved.getTripAmount().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            if (!financeTransactionRepository.existsByTripAndTransactionType(saved, "INCOME")) {
+                com.lorryowner.backend.entity.FinanceTransaction ft = new com.lorryowner.backend.entity.FinanceTransaction(
+                        saved.getOwner(),
+                        saved.getLorry(),
+                        saved,
+                        "INCOME",
+                        "FREIGHT",
+                        "Freight revenue for completed trip " + saved.getTripReference(),
+                        saved.getTripAmount(),
+                        saved.getTripDate() != null ? saved.getTripDate() : java.time.LocalDate.now(),
+                        "RECEIVED",
+                        "BANK_TRANSFER",
+                        saved.getTripReference()
+                );
+                financeTransactionRepository.save(ft);
+                log.info("Recorded trip income of ₹{} for completed trip '{}'",
+                        saved.getTripAmount(), saved.getTripReference());
+            }
+        }
+
         log.info("Trip '{}' (ID={}) completed by Driver '{}'. Status transitioned to COMPLETED.",
                 saved.getTripReference(), saved.getId(), driver.getUsername());
 
@@ -353,7 +379,8 @@ public class DriverTripController {
                 trip.getDeliveryNotes(),
                 trip.getCreatedAt(),
                 trip.getPlannedDeliveryTime(),
-                trip.getLoadType()
+                trip.getLoadType(),
+                trip.getTripAmount() != null ? trip.getTripAmount() : java.math.BigDecimal.ZERO
         );
     }
 }

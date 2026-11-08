@@ -63,6 +63,12 @@ object ApiConfig {
                 || Build.HARDWARE.contains("ranchu"))
     }
 
+    private fun isStaleUrl(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        return url.contains("10.227.208.81") || url.contains("10.231.41.81") ||
+                (url.contains(":8080") && !url.contains("10.0.2.2") && !url.contains("127.0.0.1"))
+    }
+
     /**
      * Computes candidate base URLs ordered by probability of success for the current environment.
      *
@@ -70,14 +76,23 @@ object ApiConfig {
      *   Strictly uses the production HTTPS backend URL (no emulator, loopback, or cleartext IPs).
      *
      * - In Development (Debug build):
-     *   1. Custom override URL (if explicitly configured by developer)
-     *   2. Last working URL (if previously verified)
-     *   3. PROD_BASE_URL (https://bhp-logistics-backend.getvoroa.com)
-     *   4. Local emulator / LAN IP fallbacks (for offline testing)
+     *   1. PROD_BASE_URL (https://bhp-logistics-backend.getvoroa.com) as default centralized backend
+     *   2. Custom override URL (if explicitly configured by developer and valid)
+     *   3. Last working URL (if previously verified)
+     *   4. Local emulator fallbacks (for offline testing)
      */
     fun getCandidateBaseUrls(sessionManager: SessionManager? = null): List<String> {
-        val customUrl = sessionManager?.getCustomBaseUrl()
-        val lastWorkingUrl = sessionManager?.getLastWorkingBaseUrl()
+        val rawCustom = sessionManager?.getCustomBaseUrl()
+        val customUrl = if (isStaleUrl(rawCustom)) {
+            sessionManager?.saveCustomBaseUrl(null)
+            null
+        } else rawCustom
+
+        val rawLast = sessionManager?.getLastWorkingBaseUrl()
+        val lastWorkingUrl = if (isStaleUrl(rawLast)) {
+            sessionManager?.saveLastWorkingBaseUrl(PROD_BASE_URL)
+            PROD_BASE_URL
+        } else rawLast
 
         if (IS_PRODUCTION) {
             // Production builds must only talk to production HTTPS backend
@@ -93,19 +108,16 @@ object ApiConfig {
         val candidates = if (isEmu) {
             listOfNotNull(
                 customUrl,
-                lastWorkingUrl,
                 PROD_BASE_URL,
+                lastWorkingUrl,
                 EMULATOR_BASE_URL,
-                LOOPBACK_BASE_URL,
-                DEV_LAN_BASE_URL
+                LOOPBACK_BASE_URL
             )
         } else {
             listOfNotNull(
                 customUrl,
-                lastWorkingUrl,
                 PROD_BASE_URL,
-                DEV_LAN_BASE_URL,
-                LOOPBACK_BASE_URL,
+                lastWorkingUrl,
                 EMULATOR_BASE_URL
             )
         }
@@ -122,7 +134,9 @@ object ApiConfig {
      */
     fun getBaseUrl(sessionManager: SessionManager? = null): String {
         val customUrl = sessionManager?.getCustomBaseUrl()
-        if (!customUrl.isNullOrBlank()) {
+        if (isStaleUrl(customUrl)) {
+            sessionManager?.saveCustomBaseUrl(null)
+        } else if (!customUrl.isNullOrBlank()) {
             val formatted = formatBaseUrl(customUrl)
             activeBaseUrl = formatted
             return formatted
@@ -133,10 +147,16 @@ object ApiConfig {
             return PROD_BASE_URL
         }
 
-        activeBaseUrl?.let { return it }
+        activeBaseUrl?.let {
+            if (!isStaleUrl(it)) return it
+        }
 
         val lastSaved = sessionManager?.getLastWorkingBaseUrl()
-        if (!lastSaved.isNullOrBlank()) {
+        if (isStaleUrl(lastSaved)) {
+            sessionManager?.saveLastWorkingBaseUrl(PROD_BASE_URL)
+            activeBaseUrl = PROD_BASE_URL
+            return PROD_BASE_URL
+        } else if (!lastSaved.isNullOrBlank()) {
             val formatted = formatBaseUrl(lastSaved)
             activeBaseUrl = formatted
             return formatted

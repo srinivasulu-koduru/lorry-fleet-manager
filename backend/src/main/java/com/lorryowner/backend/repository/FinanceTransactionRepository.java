@@ -1,6 +1,7 @@
 package com.lorryowner.backend.repository;
 
 import com.lorryowner.backend.entity.FinanceTransaction;
+import com.lorryowner.backend.entity.Trip;
 import com.lorryowner.backend.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,9 +13,22 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface FinanceTransactionRepository extends JpaRepository<FinanceTransaction, Long> {
+
+    boolean existsByTripAndTransactionType(Trip trip, String transactionType);
+
+    Optional<FinanceTransaction> findByTripAndTransactionType(Trip trip, String transactionType);
+
+    @Query("SELECT COALESCE(SUM(ft.amount), 0) FROM FinanceTransaction ft " +
+            "WHERE ft.owner = :owner AND ft.transactionType = 'INCOME' AND ft.paymentStatus = 'RECEIVED'")
+    BigDecimal sumIncomeByOwner(@Param("owner") User owner);
+
+    @Query("SELECT COALESCE(SUM(ft.amount), 0) FROM FinanceTransaction ft " +
+            "WHERE ft.owner = :owner AND ft.transactionType = 'EXPENSE'")
+    BigDecimal sumExpenseByOwner(@Param("owner") User owner);
 
     Page<FinanceTransaction> findByOwnerAndTransactionDateBetweenOrderByTransactionDateDesc(
             User owner,

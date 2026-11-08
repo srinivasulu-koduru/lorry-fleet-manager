@@ -37,9 +37,9 @@ spring:
     open-in-view: false
     hibernate:
       # Conservative schema management:
-      # 'validate' strictly checks that existing tables match entity definitions without modifying schema.
-      # Never use 'create', 'create-drop', or destructive schema changes in production.
-      ddl-auto: validate
+      # 'update' automatically checks and applies non-destructive schema additions (such as missing columns)
+      # without dropping or deleting any tables or existing data.
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

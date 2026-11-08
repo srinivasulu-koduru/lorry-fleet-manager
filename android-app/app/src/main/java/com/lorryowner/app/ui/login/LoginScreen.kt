@@ -427,13 +427,7 @@ fun LoginScreen(
                         )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp)
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onLongPress = { viewModel.showServerSettingsDialog() }
-                                    )
-                                }
+                            modifier = Modifier.padding(horizontal = 12.dp)
                         ) {
                             ShieldVectorIcon(
                                 tint = BhpDarkForestGreen,
@@ -459,79 +453,6 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
-        }
-
-        // Development Server Settings Dialog (Triggered via long-press on footer)
-        if (uiState.isServerSettingsDialogVisible) {
-            AlertDialog(
-                onDismissRequest = { viewModel.dismissServerSettingsDialog() },
-                containerColor = BhpCardWhite,
-                shape = RoundedCornerShape(20.dp),
-                title = {
-                    Text(
-                        text = "Backend Server Configuration",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = BhpTextBlack
-                        )
-                    )
-                },
-                text = {
-                    Column {
-                        Text(
-                            text = if (ApiConfig.IS_PRODUCTION) "Production Backend Active" else "Environment: ${if (ApiConfig.isEmulator()) "Emulator" else "Physical Device"}",
-                            style = MaterialTheme.typography.bodySmall.copy(color = BhpDarkForestGreen, fontWeight = FontWeight.SemiBold)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Production URL: ${ApiConfig.PROD_BASE_URL}",
-                            style = MaterialTheme.typography.bodySmall.copy(color = BhpTextMuted)
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        OutlinedTextField(
-                            value = uiState.serverUrlInput,
-                            onValueChange = { viewModel.onServerUrlInputChanged(it) },
-                            label = { Text("Server URL or IP", color = BhpTextMuted) },
-                            placeholder = { Text(ApiConfig.PROD_BASE_URL, color = BhpTextMuted) },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = BhpTextBlack,
-                                unfocusedTextColor = BhpTextBlack,
-                                focusedBorderColor = BhpDarkForestGreen,
-                                focusedLabelColor = BhpDarkForestGreen,
-                                unfocusedLabelColor = BhpTextMuted,
-                                cursorColor = BhpDarkForestGreen,
-                                focusedContainerColor = BhpInputBg,
-                                unfocusedContainerColor = BhpInputBg
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Easily update this if your laptop Wi-Fi/Hotspot IP changes.",
-                            style = MaterialTheme.typography.bodySmall.copy(color = BhpTextMuted, fontSize = 11.sp)
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { viewModel.saveCustomServerUrl() },
-                        colors = ButtonDefaults.buttonColors(containerColor = BhpDarkForestGreen)
-                    ) {
-                        Text("Save", color = Color.White)
-                    }
-                },
-                dismissButton = {
-                    Row {
-                        TextButton(onClick = { viewModel.resetServerUrlToDefault() }) {
-                            Text("Reset", color = BhpTextMuted)
-                        }
-                        TextButton(onClick = { viewModel.dismissServerSettingsDialog() }) {
-                            Text("Cancel", color = BhpTextBlack)
-                        }
-                    }
-                }
-            )
         }
     }
 }

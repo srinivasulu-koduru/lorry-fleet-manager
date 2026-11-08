@@ -71,6 +71,17 @@ public class OwnerLorryController {
     }
 
     /**
+     * Retrieves only available lorries eligible for immediate trip dispatch (excluding lorries on active trips).
+     * GET /api/owner/lorries/available
+     */
+    @GetMapping("/available")
+    public ResponseEntity<List<OwnerLorryDetailDto>> getAvailableLorries(Authentication authentication) {
+        String username = authentication != null ? authentication.getName() : null;
+        List<OwnerLorryDetailDto> available = ownerLorryService.getAvailableLorries(username);
+        return ResponseEntity.ok(available);
+    }
+
+    /**
      * Retrieves high-level fleet status summary (total, running, not-running,
      * percentages, total distance, total maintenance cost).
      */

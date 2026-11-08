@@ -72,6 +72,7 @@ class OwnerTripControllerTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
         cleanupDatabase();
 
         // 1. Primary Owner
@@ -148,6 +149,7 @@ class OwnerTripControllerTest {
 
     @AfterEach
     void tearDown() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
         cleanupDatabase();
     }
 

@@ -778,6 +778,9 @@ fun TripDetailsDialog(
                 TripDetailRow("Start Time", trip.startTime ?: "Not recorded")
                 TripDetailRow("Completion Time", trip.endTime ?: "Not recorded")
                 TripDetailRow("Recorded Distance", trip.distanceKm ?: "Not recorded")
+                if (trip.tripAmountFormatted != null) {
+                    TripDetailRow("Trip Revenue Amount", trip.tripAmountFormatted)
+                }
                 if (!trip.deliveryNotes.isNullOrBlank()) {
                     TripDetailRow("Delivery / Cargo Notes", trip.deliveryNotes)
                 }

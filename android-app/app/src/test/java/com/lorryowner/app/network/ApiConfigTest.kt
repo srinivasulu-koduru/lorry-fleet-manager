@@ -38,4 +38,15 @@ class ApiConfigTest {
         assertEquals("http://10.0.2.2:8080", ApiConfig.EMULATOR_BASE_URL)
         assertEquals("http://127.0.0.1:8080", ApiConfig.LOOPBACK_BASE_URL)
     }
+
+    @Test
+    fun testFormatBaseUrl_cloudDomain_usesHttpsWithoutPort() {
+        val result = ApiConfig.formatBaseUrl("bhp-logistics-backend.getvoroa.com")
+        assertEquals("https://bhp-logistics-backend.getvoroa.com", result)
+    }
+
+    @Test
+    fun testProdBaseUrl_matchesVoroaDeployment() {
+        assertEquals("https://bhp-logistics-backend.getvoroa.com", ApiConfig.PROD_BASE_URL)
+    }
 }

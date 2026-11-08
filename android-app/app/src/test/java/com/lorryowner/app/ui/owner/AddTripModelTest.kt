@@ -134,6 +134,7 @@ class AddTripModelTest {
         viewModel.onDestinationChange("Bengaluru Depot")
         viewModel.onDepartureDateSelected("2026-11-01")
         viewModel.onDepartureTimeSelected("08:30")
+        viewModel.onTripAmountChange("25000")
         viewModel.onDeliveryDateSelected("2026-11-02")
         viewModel.onDeliveryTimeSelected("14:00")
         viewModel.onLoadTypeSelected("Food and Groceries")
@@ -145,6 +146,7 @@ class AddTripModelTest {
         assertNull(viewModel.uiState.driverError)
         assertNull(viewModel.uiState.originError)
         assertNull(viewModel.uiState.destinationError)
+        assertNull(viewModel.uiState.tripAmountError)
         assertNull(viewModel.uiState.departureDateError)
         assertNull(viewModel.uiState.departureTimeError)
         assertNull(viewModel.uiState.deliveryDateError)
@@ -159,6 +161,7 @@ class AddTripModelTest {
         viewModel.onDriverSelected(sampleDriver)
         viewModel.onOriginChange("Hyderabad Hub")
         viewModel.onDestinationChange("Vijayawada Port")
+        viewModel.onTripAmountChange("15000")
         viewModel.onDepartureDateSelected("2026-11-05")
         viewModel.onDepartureTimeSelected("06:00")
         // Delivery left completely blank (ETA unavailable)
@@ -168,6 +171,36 @@ class AddTripModelTest {
         assertTrue(isValid)
         assertNull(viewModel.uiState.deliveryDateError)
         assertNull(viewModel.uiState.deliveryTimeError)
+        assertNull(viewModel.uiState.tripAmountError)
+    }
+
+    @Test
+    fun testValidation_failsWhenTripAmountMissingOrInvalid() {
+        val viewModel = AddTripViewModel(null)
+        viewModel.onLorrySelected(sampleLorry)
+        viewModel.onDriverSelected(sampleDriver)
+        viewModel.onOriginChange("Hyderabad Hub")
+        viewModel.onDestinationChange("Vijayawada Port")
+        viewModel.onDepartureDateSelected("2026-11-05")
+        viewModel.onDepartureTimeSelected("06:00")
+        viewModel.onLoadTypeSelected("General Goods")
+
+        // 1. Missing trip amount
+        val isInvalid1 = viewModel.validateForm()
+        assertFalse(isInvalid1)
+        assertEquals("Trip amount is required", viewModel.uiState.tripAmountError)
+
+        // 2. Negative trip amount
+        viewModel.onTripAmountChange("-500")
+        val isInvalid2 = viewModel.validateForm()
+        assertFalse(isInvalid2)
+        assertEquals("Please enter a valid non-negative trip amount", viewModel.uiState.tripAmountError)
+
+        // 3. Valid non-negative amount
+        viewModel.onTripAmountChange("18500.50")
+        val isValid = viewModel.validateForm()
+        assertTrue(isValid)
+        assertNull(viewModel.uiState.tripAmountError)
     }
 
     @Test

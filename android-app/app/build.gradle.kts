@@ -13,7 +13,7 @@ val localProps = Properties().apply {
         }
     }
 }
-val devBackendHost: String = localProps.getProperty("dev.backend.host") ?: "10.227.208.81"
+val devBackendHost: String = localProps.getProperty("dev.backend.host") ?: "10.0.2.2"
 val devBackendPort: Int = (localProps.getProperty("dev.backend.port") ?: "8080").toInt()
 
 android {

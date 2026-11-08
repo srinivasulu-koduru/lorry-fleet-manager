@@ -173,6 +173,13 @@ fun OwnerDashboardScreen(
         }
     }
 
+    // Refresh dashboard metrics dynamically when navigating or returning to the dashboard
+    LaunchedEffect(currentDestination) {
+        if (currentDestination == OwnerDestination.DASHBOARD) {
+            viewModel.refreshDashboard()
+        }
+    }
+
     // Intercept back button when within child screens
     BackHandler(enabled = currentDestination != OwnerDestination.DASHBOARD) {
         when (currentDestination) {

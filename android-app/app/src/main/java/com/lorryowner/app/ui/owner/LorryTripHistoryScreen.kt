@@ -484,6 +484,9 @@ fun TripDetailsModal(
                 }
                 Text("👤 Driver: ${trip.driverName}", fontSize = 13.sp, color = BhpTextSecondary)
                 Text("🚚 Lorry: ${trip.lorryRegistration}", fontSize = 13.sp, color = BhpTextSecondary)
+                if (trip.tripAmountFormatted != null) {
+                    Text("💰 Trip Amount: ${trip.tripAmountFormatted}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = BhpRunningGreen)
+                }
 
                 HorizontalDivider(color = Color(0xFFF1F5F9))
                 Text("Trip Timeline", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = BhpTextPrimary)

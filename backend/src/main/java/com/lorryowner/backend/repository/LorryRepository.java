@@ -30,8 +30,12 @@ public interface LorryRepository extends JpaRepository<Lorry, Long> {
 
     List<Lorry> findAllByOrderByUpdatedAtDesc();
 
+    List<Lorry> findTop5ByOrderByUpdatedAtDesc();
+
     @Query("SELECT l FROM Lorry l WHERE l.owner = :owner ORDER BY l.updatedAt DESC")
     List<Lorry> findByOwnerOrderByUpdatedAtDesc(@Param("owner") com.lorryowner.backend.entity.User owner);
+
+    List<Lorry> findTop5ByOwnerOrderByUpdatedAtDesc(com.lorryowner.backend.entity.User owner);
 
     @Query("SELECT l FROM Lorry l WHERE l.owner = :owner ORDER BY l.registrationNumber ASC")
     List<Lorry> findByOwnerOrderByRegistrationNumberAsc(@Param("owner") com.lorryowner.backend.entity.User owner);

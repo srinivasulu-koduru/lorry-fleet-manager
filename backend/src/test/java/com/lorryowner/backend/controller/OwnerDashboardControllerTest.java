@@ -110,8 +110,9 @@ class OwnerDashboardControllerTest {
                 .andExpect(jsonPath("$.fleetOverview.notReady").value(1))
                 .andExpect(jsonPath("$.fleetOverview.totalLorries").value(5))
                 .andExpect(jsonPath("$.financialSummary.monthLabel").value("This month"))
-                .andExpect(jsonPath("$.financialSummary.isSample").value(true))
-                .andExpect(jsonPath("$.financialSummary.income").value(389500.00))
+                .andExpect(jsonPath("$.financialSummary.isSample").value(false))
+                .andExpect(jsonPath("$.financialSummary.income").value(0))
+                .andExpect(jsonPath("$.financialSummary.totalTrips").value(0))
                 .andExpect(jsonPath("$.recentActivities", hasSize(5)));
     }
 

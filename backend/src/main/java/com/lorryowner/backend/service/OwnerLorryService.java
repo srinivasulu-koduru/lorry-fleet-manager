@@ -57,14 +57,25 @@ public class OwnerLorryService {
     public FleetSummaryDto getFleetSummary(String ownerUsername) {
         User owner = resolveOwner(ownerUsername);
 
-        long totalLorries = lorryRepository.countByOwner(owner);
-        long runningLorries = lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.ON_TRIP);
-        long loadingLorries = lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.LOADING);
-        long availableLorries = lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.AVAILABLE);
-        long notReadyLorries = lorryRepository.countByOwnerAndOperationalStatusIn(
-                owner,
-                List.of(OperationalStatus.MAINTENANCE, OperationalStatus.UNAVAILABLE)
-        );
+        List<Lorry> ownedLorries = lorryRepository.findByOwnerOrderByRegistrationNumberAsc(owner);
+        long totalLorries = ownedLorries.size();
+        long runningLorries = 0;
+        long loadingLorries = 0;
+        long availableLorries = 0;
+        long notReadyLorries = 0;
+
+        for (Lorry lorry : ownedLorries) {
+            boolean hasActiveTrip = tripRepository.existsByLorryAndTripStatusIn(lorry, List.of(TripStatus.IN_PROGRESS));
+            if (hasActiveTrip || lorry.getOperationalStatus() == OperationalStatus.ON_TRIP) {
+                runningLorries++;
+            } else if (lorry.getOperationalStatus() == OperationalStatus.LOADING) {
+                loadingLorries++;
+            } else if (lorry.getOperationalStatus() == OperationalStatus.AVAILABLE) {
+                availableLorries++;
+            } else {
+                notReadyLorries++;
+            }
+        }
         long notRunningLorries = Math.max(0, totalLorries - runningLorries);
 
         double runningPercentage = totalLorries > 0
@@ -110,6 +121,19 @@ public class OwnerLorryService {
         );
     }
 
+    public List<OwnerLorryDetailDto> getAvailableLorries(String ownerUsername) {
+        User owner = resolveOwner(ownerUsername);
+        List<Lorry> lorries = lorryRepository.findByOwnerOrderByRegistrationNumberAsc(owner);
+        List<OwnerLorryDetailDto> available = new ArrayList<>();
+        for (Lorry lorry : lorries) {
+            boolean hasActiveTrip = tripRepository.existsByLorryAndTripStatusIn(lorry, List.of(TripStatus.IN_PROGRESS));
+            if (!hasActiveTrip && lorry.getOperationalStatus() == OperationalStatus.AVAILABLE) {
+                available.add(buildLorryDetailDto(lorry, owner));
+            }
+        }
+        return available;
+    }
+
     public List<OwnerLorryDetailDto> getOwnerLorries(String ownerUsername, String filter, String search) {
         User owner = resolveOwner(ownerUsername);
         List<Lorry> lorries = lorryRepository.findByOwnerOrderByRegistrationNumberAsc(owner);
@@ -121,12 +145,18 @@ public class OwnerLorryService {
         for (Lorry lorry : lorries) {
             OwnerLorryDetailDto dto = buildLorryDetailDto(lorry, owner);
 
-            // Filter logic: ALL, RUNNING, NOT_RUNNING
+            // Filter logic: ALL, RUNNING, NOT_RUNNING, AVAILABLE
             if ("RUNNING".equals(normalizedFilter) && !dto.running()) {
                 continue;
             }
             if ("NOT_RUNNING".equals(normalizedFilter) && dto.running()) {
                 continue;
+            }
+            if ("AVAILABLE".equals(normalizedFilter)) {
+                boolean hasActiveTrip = tripRepository.existsByLorryAndTripStatusIn(lorry, List.of(TripStatus.IN_PROGRESS));
+                if (hasActiveTrip || lorry.getOperationalStatus() != OperationalStatus.AVAILABLE) {
+                    continue;
+                }
             }
 
             // Search logic (registrationNumber, makeModel, driverName)

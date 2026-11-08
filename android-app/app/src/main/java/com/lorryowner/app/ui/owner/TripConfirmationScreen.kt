@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.ui.components.*
 import com.lorryowner.app.ui.theme.*
+import java.util.Locale
 
 /**
  * Screen 2 of Stage 5: Trip Confirmation Screen.
@@ -614,6 +615,43 @@ fun TripConfirmationScreen(
                                     fontWeight = FontWeight.SemiBold,
                                     color = BhpTextPrimary,
                                     fontSize = 13.sp
+                                )
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = BhpCardBorder.copy(alpha = 0.6f), thickness = 0.8.dp)
+
+                    // Trip Amount (Revenue)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(BhpRunningGreenBg)
+                        ) {
+                            FinanceTrendingIcon(tint = BhpRunningGreen, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Trip Amount (Freight Revenue)",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = BhpTextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            )
+                            val parsedAmt = state.tripAmount.toDoubleOrNull() ?: 0.0
+                            Text(
+                                text = "₹" + String.format(Locale.getDefault(), "%,.0f", parsedAmt),
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = BhpRunningGreen,
+                                    fontSize = 14.sp
                                 )
                             )
                         }

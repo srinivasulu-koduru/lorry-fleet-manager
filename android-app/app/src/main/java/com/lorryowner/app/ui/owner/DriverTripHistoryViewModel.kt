@@ -34,7 +34,9 @@ data class TripItemUiState(
     val distanceKm: String?,
     val deliveryNotes: String?,
     val createdAt: String?,
-    val plannedDeliveryTime: String? = null
+    val plannedDeliveryTime: String? = null,
+    val tripAmount: Double = 0.0,
+    val tripAmountFormatted: String? = null
 )
 
 data class DriverPerformanceUiState(
@@ -248,6 +250,8 @@ class DriverTripHistoryViewModel(
                             String.format(Locale.US, "%,.1f km", km)
                         } else null
                         val notes = t.optString("deliveryNotes").takeIf { it.isNotBlank() }
+                        val tripAmt = if (t.has("tripAmount") && !t.isNull("tripAmount")) t.optDouble("tripAmount", 0.0) else 0.0
+                        val tripAmtFormatted = if (tripAmt > 0) "₹" + String.format(Locale.getDefault(), "%,.0f", tripAmt) else null
 
                         tripList.add(
                             TripItemUiState(
@@ -266,7 +270,9 @@ class DriverTripHistoryViewModel(
                                 endTime = end,
                                 distanceKm = dist,
                                 deliveryNotes = notes,
-                                createdAt = t.optString("createdAt").takeIf { it.isNotBlank() }
+                                createdAt = t.optString("createdAt").takeIf { it.isNotBlank() },
+                                tripAmount = tripAmt,
+                                tripAmountFormatted = tripAmtFormatted
                             )
                         )
                     }

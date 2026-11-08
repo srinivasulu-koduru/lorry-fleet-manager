@@ -1,9 +1,11 @@
 package com.lorryowner.backend.dto.trip;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -37,5 +39,24 @@ public record TripCreateDto(
         String loadType,
 
         @Size(max = 1000, message = "Remarks must not exceed 1000 characters")
-        String remarks
-) {}
+        String remarks,
+
+        @DecimalMin(value = "0.0", inclusive = true, message = "Trip amount must be non-negative")
+        BigDecimal tripAmount
+) {
+    public TripCreateDto(
+            Long lorryId,
+            Long driverId,
+            String origin,
+            String destination,
+            LocalDate plannedDepartureDate,
+            LocalTime plannedDepartureTime,
+            LocalDate plannedDeliveryDate,
+            LocalTime plannedDeliveryTime,
+            String loadType,
+            String remarks
+    ) {
+        this(lorryId, driverId, origin, destination, plannedDepartureDate, plannedDepartureTime,
+                plannedDeliveryDate, plannedDeliveryTime, loadType, remarks, BigDecimal.ZERO);
+    }
+}

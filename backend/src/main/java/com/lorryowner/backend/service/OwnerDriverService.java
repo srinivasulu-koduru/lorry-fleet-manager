@@ -127,6 +127,23 @@ public class OwnerDriverService {
     }
 
     /**
+     * Lists active drivers belonging to the owner who are not currently assigned to an active IN_PROGRESS trip.
+     */
+    @Transactional(readOnly = true)
+    public List<DriverResponse> getAvailableDrivers(String ownerUsername) {
+        User owner = resolveOwner(ownerUsername);
+        List<User> drivers = owner != null
+                ? userRepository.findDriversForOwner(Role.DRIVER, owner)
+                : userRepository.findByRole(Role.DRIVER);
+
+        return drivers.stream()
+                .filter(User::isActive)
+                .filter(driver -> !tripRepository.existsByDriverAndTripStatusIn(driver, List.of(TripStatus.IN_PROGRESS)))
+                .map(this::mapToDriverResponse)
+                .toList();
+    }
+
+    /**
      * Lists all drivers belonging to the authenticated owner with optional search and filters.
      */
     @Transactional(readOnly = true)
@@ -141,9 +158,14 @@ public class OwnerDriverService {
 
         return drivers.stream()
                 .filter(driver -> {
-                    // Status filter: ALL, ACTIVE, INACTIVE
-                    if ("ACTIVE".equalsIgnoreCase(status) && !driver.isActive()) return false;
-                    if ("INACTIVE".equalsIgnoreCase(status) && driver.isActive()) return false;
+                    // Status filter: ALL, ACTIVE, INACTIVE, AVAILABLE
+                    if ("AVAILABLE".equalsIgnoreCase(status)) {
+                        if (!driver.isActive()) return false;
+                        if (tripRepository.existsByDriverAndTripStatusIn(driver, List.of(TripStatus.IN_PROGRESS))) return false;
+                    } else {
+                        if ("ACTIVE".equalsIgnoreCase(status) && !driver.isActive()) return false;
+                        if ("INACTIVE".equalsIgnoreCase(status) && driver.isActive()) return false;
+                    }
 
                     // Assigned filter: ALL, ASSIGNED, UNASSIGNED
                     if ("ASSIGNED".equalsIgnoreCase(assigned) && driver.getAssignedLorry() == null) return false;

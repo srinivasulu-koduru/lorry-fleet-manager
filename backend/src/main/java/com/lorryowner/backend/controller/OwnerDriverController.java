@@ -57,6 +57,16 @@ public class OwnerDriverController {
     }
 
     /**
+     * Lists only available drivers eligible for immediate trip dispatch (excluding drivers on active trips).
+     * GET /api/owner/drivers/available
+     */
+    @GetMapping("/available")
+    public ResponseEntity<List<DriverResponse>> getAvailableDrivers(Authentication authentication) {
+        String ownerUsername = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(ownerDriverService.getAvailableDrivers(ownerUsername));
+    }
+
+    /**
      * Retrieves details for a specific driver.
      */
     @GetMapping("/{id}")

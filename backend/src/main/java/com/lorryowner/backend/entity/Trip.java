@@ -53,6 +53,9 @@ public class Trip {
     @Column(name = "distance_km", precision = 8, scale = 2)
     private BigDecimal distanceKm;
 
+    @Column(name = "trip_amount", precision = 12, scale = 2)
+    private BigDecimal tripAmount = BigDecimal.ZERO;
+
     @Column(name = "planned_delivery_time")
     private Instant plannedDeliveryTime;
 
@@ -194,6 +197,14 @@ public class Trip {
 
     public void setDistanceKm(BigDecimal distanceKm) {
         this.distanceKm = distanceKm;
+    }
+
+    public BigDecimal getTripAmount() {
+        return tripAmount != null ? tripAmount : BigDecimal.ZERO;
+    }
+
+    public void setTripAmount(BigDecimal tripAmount) {
+        this.tripAmount = tripAmount != null ? tripAmount : BigDecimal.ZERO;
     }
 
     public Instant getPlannedDeliveryTime() {

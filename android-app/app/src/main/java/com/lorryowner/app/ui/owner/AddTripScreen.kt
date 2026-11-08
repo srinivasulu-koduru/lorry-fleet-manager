@@ -516,6 +516,53 @@ fun AddTripScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Trip Amount Required
+            Text(
+                text = "Trip Amount (₹) *",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = BhpTextPrimary,
+                    fontSize = 13.sp
+                )
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedTextField(
+                value = state.tripAmount,
+                onValueChange = { viewModel.onTripAmountChange(it) },
+                placeholder = { Text("e.g. 25000", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
+                prefix = {
+                    Text(
+                        text = "₹ ",
+                        fontWeight = FontWeight.Bold,
+                        color = BhpNavyDark,
+                        fontSize = 14.sp
+                    )
+                },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                ),
+                isError = state.tripAmountError != null,
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = BhpCardWhite,
+                    unfocusedContainerColor = BhpCardWhite,
+                    focusedBorderColor = BhpRunningGreen,
+                    unfocusedBorderColor = BhpCardBorder
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (state.tripAmountError != null) {
+                Text(
+                    text = state.tripAmountError,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             // 9. Load Type Dropdown
             Text(
                 text = "Load Type *",

@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.lorryowner.app.network.ApiConfig
 import com.lorryowner.app.security.SessionManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -17,6 +18,7 @@ import java.io.BufferedReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -50,7 +52,9 @@ data class CreatedTripUiState(
     val plannedDeliveryFormatted: String?,
     val loadType: String,
     val remarks: String?,
-    val status: String
+    val status: String,
+    val tripAmount: Double = 0.0,
+    val tripAmountFormatted: String = "₹0"
 )
 
 data class AddTripUiState(
@@ -61,6 +65,7 @@ data class AddTripUiState(
     val selectedDriver: DriverOption? = null,
     val origin: String = "",
     val destination: String = "",
+    val tripAmount: String = "",
     val plannedDepartureDate: String = "",
     val plannedDepartureTime: String = "",
     val plannedDeliveryDate: String = "",
@@ -73,6 +78,7 @@ data class AddTripUiState(
     val driverError: String? = null,
     val originError: String? = null,
     val destinationError: String? = null,
+    val tripAmountError: String? = null,
     val departureDateError: String? = null,
     val departureTimeError: String? = null,
     val deliveryDateError: String? = null,
@@ -109,8 +115,10 @@ class AddTripViewModel(
     fun loadEligibleLorriesAndDrivers() {
         viewModelScope.launch {
             uiState = uiState.copy(isLoadingLorriesAndDrivers = true, generalError = null)
-            val lorriesResult = withContext(Dispatchers.IO) { fetchLorries() }
-            val driversResult = withContext(Dispatchers.IO) { fetchDrivers() }
+            val lorriesDeferred = async(Dispatchers.IO) { fetchLorries() }
+            val driversDeferred = async(Dispatchers.IO) { fetchDrivers() }
+            val lorriesResult = lorriesDeferred.await()
+            val driversResult = driversDeferred.await()
 
             uiState = uiState.copy(isLoadingLorriesAndDrivers = false)
 
@@ -200,6 +208,10 @@ class AddTripViewModel(
         uiState = uiState.copy(customLoadType = value, loadTypeError = null)
     }
 
+    fun onTripAmountChange(value: String) {
+        uiState = uiState.copy(tripAmount = value, tripAmountError = null)
+    }
+
     fun onRemarksChange(value: String) {
         uiState = uiState.copy(remarks = value)
     }
@@ -214,6 +226,7 @@ class AddTripViewModel(
         var driverErr: String? = null
         var originErr: String? = null
         var destErr: String? = null
+        var tripAmtErr: String? = null
         var depDateErr: String? = null
         var depTimeErr: String? = null
         var delDateErr: String? = null
@@ -241,6 +254,18 @@ class AddTripViewModel(
         } else if (uiState.origin.trim().equals(uiState.destination.trim(), ignoreCase = true)) {
             destErr = "Destination must be different from origin"
             hasError = true
+        }
+
+        val trimmedAmt = uiState.tripAmount.trim()
+        if (trimmedAmt.isEmpty()) {
+            tripAmtErr = "Trip amount is required"
+            hasError = true
+        } else {
+            val parsedAmt = trimmedAmt.toDoubleOrNull()
+            if (parsedAmt == null || parsedAmt < 0.0) {
+                tripAmtErr = "Please enter a valid non-negative trip amount"
+                hasError = true
+            }
         }
 
         if (uiState.plannedDepartureDate.isBlank()) {
@@ -288,6 +313,7 @@ class AddTripViewModel(
             driverError = driverErr,
             originError = originErr,
             destinationError = destErr,
+            tripAmountError = tripAmtErr,
             departureDateError = depDateErr,
             departureTimeError = depTimeErr,
             deliveryDateError = delDateErr,
@@ -353,6 +379,7 @@ class AddTripViewModel(
         var lastException: Exception? = null
 
         val effectiveLoadType = if (uiState.loadType == "Other") uiState.customLoadType.trim() else uiState.loadType.trim()
+        val tripAmountVal = uiState.tripAmount.trim().toDoubleOrNull() ?: 0.0
 
         val payload = JSONObject().apply {
             put("lorryId", uiState.selectedLorry!!.id)
@@ -366,6 +393,7 @@ class AddTripViewModel(
                 put("plannedDeliveryTime", uiState.plannedDeliveryTime)
             }
             put("loadType", effectiveLoadType)
+            put("tripAmount", tripAmountVal)
             if (uiState.remarks.trim().isNotBlank()) {
                 put("remarks", uiState.remarks.trim())
             }
@@ -406,6 +434,9 @@ class AddTripViewModel(
                         formatDateTimeDisplay(uiState.plannedDeliveryDate, uiState.plannedDeliveryTime)
                     } else null
 
+                    val resAmount = json.optDouble("tripAmount", tripAmountVal)
+                    val formattedAmount = formatCurrency(resAmount)
+
                     val created = CreatedTripUiState(
                         id = json.optLong("id"),
                         tripReference = json.optString("tripReference", "TRIP-CREATED"),
@@ -419,7 +450,9 @@ class AddTripViewModel(
                         plannedDeliveryFormatted = delFormatted,
                         loadType = effectiveLoadType,
                         remarks = uiState.remarks.trim().ifEmpty { null },
-                        status = json.optString("status", "PLANNED")
+                        status = json.optString("status", "PLANNED"),
+                        tripAmount = resAmount,
+                        tripAmountFormatted = formattedAmount
                     )
                     return Result.success(created)
                 } else {
@@ -454,7 +487,7 @@ class AddTripViewModel(
         var lastEx: Exception? = null
 
         for (baseUrl in candidateUrls) {
-            val endpointUrl = "$baseUrl/api/owner/lorries?filter=ALL"
+            val endpointUrl = "$baseUrl/api/owner/lorries/available"
             var connection: HttpURLConnection? = null
             try {
                 val url = URL(endpointUrl)
@@ -502,7 +535,7 @@ class AddTripViewModel(
         var lastEx: Exception? = null
 
         for (baseUrl in candidateUrls) {
-            val endpointUrl = "$baseUrl/api/owner/drivers"
+            val endpointUrl = "$baseUrl/api/owner/drivers/available"
             var connection: HttpURLConnection? = null
             try {
                 val url = URL(endpointUrl)
@@ -543,6 +576,22 @@ class AddTripViewModel(
             }
         }
         return Result.failure(lastEx ?: Exception("Failed to load drivers"))
+    }
+
+    fun formatCurrency(amount: Double): String {
+        return try {
+            val locale = Locale.Builder().setLanguage("en").setRegion("IN").build()
+            val formatter = NumberFormat.getCurrencyInstance(locale)
+            formatter.maximumFractionDigits = 0
+            val formatted = formatter.format(amount)
+            if (!formatted.startsWith("₹")) {
+                "₹" + NumberFormat.getNumberInstance(locale).format(amount.toLong())
+            } else {
+                formatted
+            }
+        } catch (e: Exception) {
+            "₹" + amount.toLong().toString()
+        }
     }
 
     fun formatDateTimeDisplay(dateStr: String, timeStr: String): String {

@@ -277,7 +277,9 @@ class LorryDetailsViewModel(
                             distanceKm = if (t.has("distanceKm") && !t.isNull("distanceKm")) "${t.optDouble("distanceKm")} km" else null,
                             deliveryNotes = if (t.has("deliveryNotes") && !t.isNull("deliveryNotes")) t.optString("deliveryNotes") else null,
                             createdAt = t.optString("createdAt"),
-                            plannedDeliveryTime = if (t.has("plannedDeliveryTime") && !t.isNull("plannedDeliveryTime")) t.optString("plannedDeliveryTime") else null
+                            plannedDeliveryTime = if (t.has("plannedDeliveryTime") && !t.isNull("plannedDeliveryTime")) t.optString("plannedDeliveryTime") else null,
+                            tripAmount = if (t.has("tripAmount") && !t.isNull("tripAmount")) t.optDouble("tripAmount", 0.0) else 0.0,
+                            tripAmountFormatted = if (t.has("tripAmount") && !t.isNull("tripAmount") && t.optDouble("tripAmount", 0.0) > 0) "₹" + String.format(java.util.Locale.getDefault(), "%,.0f", t.optDouble("tripAmount", 0.0)) else null
                         )
                     )
                 }

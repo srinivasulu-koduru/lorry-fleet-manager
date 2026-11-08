@@ -22,7 +22,8 @@ public record TripDto(
         String deliveryNotes,
         Instant createdAt,
         Instant plannedDeliveryTime,
-        String loadType
+        String loadType,
+        BigDecimal tripAmount
 ) {
     public TripDto(
             Long id,
@@ -44,7 +45,7 @@ public record TripDto(
     ) {
         this(id, tripReference, driverId, driverName, lorryId, lorryRegistration, lorryMakeModel,
                 originLocation, destinationLocation, tripStatus, tripDate, startTime, endTime,
-                distanceKm, deliveryNotes, createdAt, null, null);
+                distanceKm, deliveryNotes, createdAt, null, null, BigDecimal.ZERO);
     }
 
     public TripDto(
@@ -68,6 +69,31 @@ public record TripDto(
     ) {
         this(id, tripReference, driverId, driverName, lorryId, lorryRegistration, lorryMakeModel,
                 originLocation, destinationLocation, tripStatus, tripDate, startTime, endTime,
-                distanceKm, deliveryNotes, createdAt, plannedDeliveryTime, null);
+                distanceKm, deliveryNotes, createdAt, plannedDeliveryTime, null, BigDecimal.ZERO);
+    }
+
+    public TripDto(
+            Long id,
+            String tripReference,
+            Long driverId,
+            String driverName,
+            Long lorryId,
+            String lorryRegistration,
+            String lorryMakeModel,
+            String originLocation,
+            String destinationLocation,
+            String tripStatus,
+            LocalDate tripDate,
+            Instant startTime,
+            Instant endTime,
+            BigDecimal distanceKm,
+            String deliveryNotes,
+            Instant createdAt,
+            Instant plannedDeliveryTime,
+            String loadType
+    ) {
+        this(id, tripReference, driverId, driverName, lorryId, lorryRegistration, lorryMakeModel,
+                originLocation, destinationLocation, tripStatus, tripDate, startTime, endTime,
+                distanceKm, deliveryNotes, createdAt, plannedDeliveryTime, loadType, BigDecimal.ZERO);
     }
 }

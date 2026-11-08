@@ -8,5 +8,17 @@ public record FinancialSummaryDto(
     BigDecimal income,
     BigDecimal expenses,
     BigDecimal profit,
-    String currencySymbol
-) {}
+    String currencySymbol,
+    Long totalTrips
+) {
+    public FinancialSummaryDto(
+            String monthLabel,
+            boolean isSample,
+            BigDecimal income,
+            BigDecimal expenses,
+            BigDecimal profit,
+            String currencySymbol
+    ) {
+        this(monthLabel, isSample, income, expenses, profit, currencySymbol, 0L);
+    }
+}

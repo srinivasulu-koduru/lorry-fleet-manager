@@ -84,9 +84,12 @@ CREATE TABLE IF NOT EXISTS trips (
     planned_delivery_time TIMESTAMPTZ NULL,
     load_type VARCHAR(100) NULL,
     delivery_notes TEXT NULL,
+    trip_amount NUMERIC(12, 2) DEFAULT 0.00,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS trip_amount NUMERIC(12, 2) DEFAULT 0.00;
 
 CREATE INDEX IF NOT EXISTS idx_trips_driver ON trips(driver_id);
 CREATE INDEX IF NOT EXISTS idx_trips_lorry ON trips(lorry_id);

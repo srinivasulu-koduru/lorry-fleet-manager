@@ -1,5 +1,6 @@
 package com.lorryowner.backend.controller;
 
+import com.lorryowner.backend.dto.driver.UpdateTripNotesRequest;
 import com.lorryowner.backend.dto.trip.TripCreateDto;
 import com.lorryowner.backend.dto.trip.TripResponseDto;
 import com.lorryowner.backend.service.OwnerTripService;
@@ -50,6 +51,36 @@ public class OwnerTripController {
     ) {
         String ownerUsername = authentication != null ? authentication.getName() : null;
         TripResponseDto response = ownerTripService.getTripById(id, ownerUsername);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Starts a planned trip.
+     * POST /api/owner/trips/{id}/start
+     */
+    @PostMapping("/{id}/start")
+    public ResponseEntity<TripResponseDto> startTrip(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        String ownerUsername = authentication != null ? authentication.getName() : null;
+        TripResponseDto response = ownerTripService.startTrip(id, ownerUsername);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Completes an in-progress trip.
+     * POST /api/owner/trips/{id}/complete
+     */
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<TripResponseDto> completeTrip(
+            @PathVariable Long id,
+            @RequestBody(required = false) UpdateTripNotesRequest request,
+            Authentication authentication
+    ) {
+        String ownerUsername = authentication != null ? authentication.getName() : null;
+        String notes = request != null ? request.notes() : null;
+        TripResponseDto response = ownerTripService.completeTrip(id, notes, ownerUsername);
         return ResponseEntity.ok(response);
     }
 

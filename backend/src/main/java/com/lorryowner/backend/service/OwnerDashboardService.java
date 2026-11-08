@@ -6,8 +6,12 @@ import com.lorryowner.backend.dto.owner.OwnerDashboardResponse;
 import com.lorryowner.backend.dto.owner.RecentActivityDto;
 import com.lorryowner.backend.entity.Lorry;
 import com.lorryowner.backend.entity.OperationalStatus;
+import com.lorryowner.backend.entity.TripStatus;
 import com.lorryowner.backend.entity.User;
+import com.lorryowner.backend.repository.FinanceTransactionRepository;
 import com.lorryowner.backend.repository.LorryRepository;
+import com.lorryowner.backend.repository.MaintenanceRecordRepository;
+import com.lorryowner.backend.repository.TripRepository;
 import com.lorryowner.backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,10 +28,22 @@ public class OwnerDashboardService {
 
     private final LorryRepository lorryRepository;
     private final UserRepository userRepository;
+    private final TripRepository tripRepository;
+    private final FinanceTransactionRepository financeTransactionRepository;
+    private final MaintenanceRecordRepository maintenanceRecordRepository;
 
-    public OwnerDashboardService(LorryRepository lorryRepository, UserRepository userRepository) {
+    public OwnerDashboardService(
+            LorryRepository lorryRepository,
+            UserRepository userRepository,
+            TripRepository tripRepository,
+            FinanceTransactionRepository financeTransactionRepository,
+            MaintenanceRecordRepository maintenanceRecordRepository
+    ) {
         this.lorryRepository = lorryRepository;
         this.userRepository = userRepository;
+        this.tripRepository = tripRepository;
+        this.financeTransactionRepository = financeTransactionRepository;
+        this.maintenanceRecordRepository = maintenanceRecordRepository;
     }
 
     public OwnerDashboardResponse getDashboardData(String username) {
@@ -43,24 +59,31 @@ public class OwnerDashboardService {
             }
         }
 
-        // Real fleet counts calculated directly from MySQL database scoped by owner
-        long runningNow = owner != null
-                ? lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.ON_TRIP)
-                : lorryRepository.countByOperationalStatus(OperationalStatus.ON_TRIP);
-        long readyToStart = owner != null
-                ? lorryRepository.countByOwnerAndOperationalStatus(owner, OperationalStatus.AVAILABLE)
-                : lorryRepository.countByOperationalStatus(OperationalStatus.AVAILABLE);
-        long totalLorries = owner != null
-                ? lorryRepository.countByOwner(owner)
-                : lorryRepository.count();
-        long notReady = owner != null
-                ? lorryRepository.countByOwnerAndOperationalStatusIn(
-                        owner,
-                        List.of(OperationalStatus.MAINTENANCE, OperationalStatus.UNAVAILABLE, OperationalStatus.LOADING)
-                )
-                : lorryRepository.countByOperationalStatusIn(
-                        List.of(OperationalStatus.MAINTENANCE, OperationalStatus.UNAVAILABLE, OperationalStatus.LOADING)
-                );
+        // Fleet metrics calculated strictly from actual database records scoped by owner
+        // Business rules:
+        // 1. Total Lorries = all lorries belonging to the authenticated owner.
+        // 2. Running Now = lorries with an active IN_PROGRESS trip.
+        // 3. Ready to Start = available lorries that are not currently running and are eligible for a new trip.
+        // 4. Not Loaded / Not Ready = lorries that are not running and are not ready (maintenance, loading, unavailable).
+        List<Lorry> ownedLorries = owner != null
+                ? lorryRepository.findByOwnerOrderByUpdatedAtDesc(owner)
+                : lorryRepository.findAllByOrderByUpdatedAtDesc();
+
+        long totalLorries = ownedLorries.size();
+        long runningNow = 0;
+        long readyToStart = 0;
+        long notReady = 0;
+
+        for (Lorry lorry : ownedLorries) {
+            boolean hasActiveTrip = tripRepository.existsByLorryAndTripStatusIn(lorry, List.of(TripStatus.IN_PROGRESS));
+            if (hasActiveTrip || lorry.getOperationalStatus() == OperationalStatus.ON_TRIP) {
+                runningNow++;
+            } else if (lorry.getOperationalStatus() == OperationalStatus.AVAILABLE) {
+                readyToStart++;
+            } else {
+                notReady++;
+            }
+        }
 
         FleetOverviewDto fleetOverview = new FleetOverviewDto(
                 runningNow,
@@ -69,25 +92,30 @@ public class OwnerDashboardService {
                 totalLorries
         );
 
-        // Monthly financial figures (marked as sample per reference design)
+        // Dynamic financial figures calculated from actual database records scoped by owner
+        long totalTrips = owner != null ? tripRepository.countByOwner(owner) : tripRepository.count();
+        BigDecimal totalIncome = owner != null ? financeTransactionRepository.sumIncomeByOwner(owner) : BigDecimal.ZERO;
+        BigDecimal otherExpenses = owner != null ? financeTransactionRepository.sumExpenseByOwner(owner) : BigDecimal.ZERO;
+        BigDecimal maintExpenses = owner != null ? maintenanceRecordRepository.sumCostByOwner(owner) : BigDecimal.ZERO;
+        BigDecimal totalExpenses = otherExpenses.add(maintExpenses);
+        BigDecimal netProfit = totalIncome.subtract(totalExpenses);
+
         FinancialSummaryDto financialSummary = new FinancialSummaryDto(
                 "This month",
-                true,
-                new BigDecimal("389500.00"),
-                new BigDecimal("258000.00"),
-                new BigDecimal("131500.00"),
-                "₹"
+                false,
+                totalIncome,
+                totalExpenses,
+                netProfit,
+                "₹",
+                totalTrips
         );
 
-        // Real activity items derived from registered fleet lorries belonging to the owner
-        List<Lorry> lorries = owner != null
-                ? lorryRepository.findByOwnerOrderByUpdatedAtDesc(owner)
-                : lorryRepository.findAllByOrderByUpdatedAtDesc();
+        // Top 5 recent activities derived from owner's lorries
         List<RecentActivityDto> recentActivities = new ArrayList<>();
         Instant now = Instant.now();
 
         int index = 0;
-        for (Lorry lorry : lorries) {
+        for (Lorry lorry : ownedLorries) {
             String color;
             String type;
             String desc = (lorry.getNotes() != null && !lorry.getNotes().isBlank())
