@@ -2,6 +2,16 @@ package com.lorryowner.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+// BHP Logistics Approved Maroon & Gold Brand Palette (Reference Design)
+val BhpMaroonPrimary = Color(0xFF790018)  // Primary Deep Maroon
+val BhpMaroonDark = Color(0xFF520014)     // Dark Maroon
+val BhpMaroonDeep = Color(0xFF38000D)     // Deep Maroon Gradient End
+val BhpGold = Color(0xFFFFC107)           // Brand Gold Accent
+val BhpGoldAccent = Color(0xFFFFD54F)     // Light Gold Highlight
+val BhpGoldDark = Color(0xFFD97706)       // Dark Gold / Amber
+val BhpBgLight = Color(0xFFF7F8FC)        // Premium Off-white Dashboard Background
+val BhpMaroonSubtext = Color(0xFFFECDD3)   // Light pinkish/cream subtext for maroon headers
+
 // BHP Logistics Official Brand Color Palette (Sampled from Reference Image)
 val BhpDarkForestGreen = Color(0xFF10513D) // Dark forest green (Button & Primary Brand: RGB 16, 81, 61)
 val BhpDeepTeal = Color(0xFF052F2B)        // Background deep teal sky (RGB 5, 47, 43)

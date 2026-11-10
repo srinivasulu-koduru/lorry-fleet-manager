@@ -52,10 +52,10 @@ fun LorryOwnerAppTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = BhpNavyDark.toArgb()
-            window.navigationBarColor = Color.White.toArgb()
+            window.statusBarColor = BhpMaroonPrimary.toArgb()
+            window.navigationBarColor = BhpMaroonDark.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
         }
     }
 

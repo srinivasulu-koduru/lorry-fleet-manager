@@ -71,9 +71,11 @@ import com.lorryowner.app.ui.theme.BhpCardWhite
 import com.lorryowner.app.ui.theme.BhpDarkForestGreen
 import com.lorryowner.app.ui.theme.BhpDeepTeal
 import com.lorryowner.app.ui.theme.BhpFooterDivider
+import com.lorryowner.app.ui.theme.BhpGold
 import com.lorryowner.app.ui.theme.BhpInputBg
 import com.lorryowner.app.ui.theme.BhpInputBorder
 import com.lorryowner.app.ui.theme.BhpInputDivider
+import com.lorryowner.app.ui.theme.BhpMaroonPrimary
 import com.lorryowner.app.ui.theme.BhpTextBlack
 import com.lorryowner.app.ui.theme.BhpTextMuted
 
@@ -119,11 +121,11 @@ fun LoginScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // 1. Upper Section: Photographic Truck & Highway Header Scene
+            // 1. Upper Section: Photographic Truck & Highway Header Scene with Official BHP Logo
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(BhpDeepTeal)
+                    .background(BhpMaroonPrimary)
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.bhp_truck_highway),
@@ -131,6 +133,25 @@ fun LoginScreen(
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // Official BHP Logistics Badge
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(14.dp),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(start = 20.dp, top = 12.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.bhp_logo),
+                        contentDescription = "BHP Logistics Official Logo",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .padding(4.dp)
+                    )
+                }
             }
 
             // 2. Lower Section: Pure White Card Overlapping the Bottom Edge of the Road
@@ -362,7 +383,7 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Dark Green Login Button with White Arrow
+                    // Maroon & Gold Login Button with Arrow
                     Button(
                         onClick = {
                             focusManager.clearFocus()
@@ -372,9 +393,9 @@ fun LoginScreen(
                         enabled = !uiState.isLoading,
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = BhpDarkForestGreen,
+                            containerColor = BhpMaroonPrimary,
                             contentColor = Color.White,
-                            disabledContainerColor = BhpDarkForestGreen.copy(alpha = 0.6f),
+                            disabledContainerColor = BhpMaroonPrimary.copy(alpha = 0.6f),
                             disabledContentColor = Color.White.copy(alpha = 0.6f)
                         ),
                         modifier = Modifier
@@ -384,7 +405,7 @@ fun LoginScreen(
                     ) {
                         if (uiState.isLoading) {
                             CircularProgressIndicator(
-                                color = Color.White,
+                                color = BhpGold,
                                 strokeWidth = 2.5.dp,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -403,7 +424,7 @@ fun LoginScreen(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 ArrowForwardVectorIcon(
-                                    tint = Color.White,
+                                    tint = BhpGold,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }

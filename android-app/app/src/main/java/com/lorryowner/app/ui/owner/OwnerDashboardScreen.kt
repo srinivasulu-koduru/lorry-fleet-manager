@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -55,8 +57,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -92,11 +96,19 @@ import com.lorryowner.app.ui.components.ShieldVectorIcon
 import com.lorryowner.app.ui.components.WrenchToolIcon
 import com.lorryowner.app.ui.theme.BhpAvatarBorder
 import com.lorryowner.app.ui.theme.BhpAvatarCream
+import com.lorryowner.app.ui.theme.BhpBgLight
 import com.lorryowner.app.ui.theme.BhpCardBorder
 import com.lorryowner.app.ui.theme.BhpCardWhite
 import com.lorryowner.app.ui.theme.BhpDarkForestGreen
 import com.lorryowner.app.ui.theme.BhpDieselOrange
 import com.lorryowner.app.ui.theme.BhpDriverBlue
+import com.lorryowner.app.ui.theme.BhpGold
+import com.lorryowner.app.ui.theme.BhpGoldAccent
+import com.lorryowner.app.ui.theme.BhpGoldDark
+import com.lorryowner.app.ui.theme.BhpMaroonDark
+import com.lorryowner.app.ui.theme.BhpMaroonDeep
+import com.lorryowner.app.ui.theme.BhpMaroonPrimary
+import com.lorryowner.app.ui.theme.BhpMaroonSubtext
 import com.lorryowner.app.ui.theme.BhpNavyContainer
 import com.lorryowner.app.ui.theme.BhpNavyDark
 import com.lorryowner.app.ui.theme.BhpNotReadyAmber
@@ -583,10 +595,10 @@ private fun DashboardMainScaffold(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF8FAFC))
-                .padding(innerPadding)
+                .background(BhpBgLight)
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
-            // 1. Clean Light Header (Rule 2)
+            // 1. Premium Branded Maroon Wave Header with Real Logo & System Insets
             OwnerDashboardTopBar(
                 onMenuClick = { viewModel.showProfileDialog() },
                 unreadNotifications = state.unreadNotificationsCount,
@@ -607,46 +619,43 @@ private fun DashboardMainScaffold(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    // A. Automatic Rotating Welcome Banner (Rule 3 - 5 Slides, Auto-looping, Dots)
+                    // A. Hero Welcome Banner (Your Fleet, Your Control • Smooth Auto-Carousel)
                     OwnerRotatingWelcomeBanner()
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                // B. Circular Fleet Overview (Rule 4 - Donut Chart, Status Counts & Filter)
-                CircularFleetOverviewCard(
-                    fleetOverview = state.fleetOverview,
-                    onRunningClick = onNavigateToRunningLorries,
-                    onReadyClick = onNavigateToMyLorries,
-                    onNotReadyClick = onNavigateToNotRunningLorries
-                )
+                    // B. Circular Fleet Overview (Donut Chart, Status Counts, Watermark & Month Filter)
+                    CircularFleetOverviewCard(
+                        fleetOverview = state.fleetOverview,
+                        onRunningClick = onNavigateToRunningLorries,
+                        onReadyClick = onNavigateToMyLorries,
+                        onNotReadyClick = onNavigateToNotRunningLorries
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                // C. Financial Summary Cards (Rule 5 - 2x2 Grid: Total Trips, Total Income, Total Expenses, Net Profit)
-                DashboardFinancialCardsGrid(
-                    financialSummary = state.financialSummary,
-                    onTripsClick = onNavigateToAddTrip,
-                    onIncomeClick = onNavigateToFinance,
-                    onExpensesClick = onNavigateToMaintenance,
-                    onProfitClick = onNavigateToFinance
-                )
+                    // C. Financial Summary Cards (2x2 Grid: Total Trips, Total Income, Total Expenses, Net Profit)
+                    DashboardFinancialCardsGrid(
+                        financialSummary = state.financialSummary,
+                        onTripsClick = onNavigateToAddTrip,
+                        onIncomeClick = onNavigateToFinance,
+                        onExpensesClick = onNavigateToMaintenance,
+                        onProfitClick = onNavigateToFinance
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                // D. Quick Actions Section (Rule 6 - Emerald Header + 2-Column Grid of 6 Actions)
-                QuickActionsSection(
-                    onAddTripClick = onNavigateToAddTrip,
-                    onManageDriversClick = onNavigateToDrivers,
-                    onMaintenanceClick = onNavigateToMaintenance,
-                    onFinanceClick = onNavigateToFinance,
-                    onMyLorriesClick = onNavigateToMyLorries,
-                    onLiveTrackingClick = onNavigateToLiveTracking
-                )
+                    // D. Quick Actions Section (Exactly 3 Actions: Add Trip, Manage Drivers, My Lorries)
+                    QuickActionsSection(
+                        onAddTripClick = onNavigateToAddTrip,
+                        onManageDriversClick = onNavigateToDrivers,
+                        onMyLorriesClick = onNavigateToMyLorries
+                    )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
         }
-    }
     }
 
     // Modal Dialog: Fleet Lorries Inspector
@@ -673,7 +682,9 @@ private fun DashboardMainScaffold(
 }
 
 /**
- * Top Header: BHP Logistics Branding, Subtitle, Menu icon, Notification icon.
+ * Top Header: BHP Logistics Branding, Subtitle, Real Logo, Refresh, Notification Bell.
+ * Rendered with an Organic Curved Wave filled with Deep Maroon Gradient and a Gold Accent Line,
+ * seamlessly transitioning to the light background underneath.
  */
 @Composable
 fun OwnerDashboardTopBar(
@@ -683,26 +694,91 @@ fun OwnerDashboardTopBar(
     onRefreshClick: (() -> Unit)? = null,
     isRefreshing: Boolean = false
 ) {
-    Surface(
-        color = Color.White,
-        shadowElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val waveHeightPx = with(density) { 26.dp.toPx() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawBehind {
+                val w = size.width
+                val h = size.height
+
+                // Wave path defining the organic bottom boundary of the header:
+                // Dips gently on the left under the logo badge (up to h),
+                // then swoops up smoothly towards the right (up to h - waveHeightPx).
+                val wavePath = Path().apply {
+                    moveTo(0f, 0f)
+                    lineTo(0f, h - waveHeightPx * 0.55f)
+                    cubicTo(
+                        w * 0.08f, h,
+                        w * 0.22f, h,
+                        w * 0.38f, h - waveHeightPx * 0.35f
+                    )
+                    cubicTo(
+                        w * 0.58f, h - waveHeightPx * 0.85f,
+                        w * 0.80f, h - waveHeightPx * 1.0f,
+                        w, h - waveHeightPx * 0.65f
+                    )
+                    lineTo(w, 0f)
+                    close()
+                }
+
+                // Fill only above the wave with rich maroon gradient
+                drawPath(
+                    path = wavePath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(BhpMaroonPrimary, BhpMaroonDark)
+                    )
+                )
+
+                // Gold trim line tracing the exact wave
+                val goldPath = Path().apply {
+                    moveTo(0f, h - waveHeightPx * 0.55f)
+                    cubicTo(
+                        w * 0.08f, h,
+                        w * 0.22f, h,
+                        w * 0.38f, h - waveHeightPx * 0.35f
+                    )
+                    cubicTo(
+                        w * 0.58f, h - waveHeightPx * 0.85f,
+                        w * 0.80f, h - waveHeightPx * 1.0f,
+                        w, h - waveHeightPx * 0.65f
+                    )
+                }
+
+                drawPath(
+                    path = goldPath,
+                    color = BhpGold,
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
+            }
+            .statusBarsPadding()
+            .padding(bottom = 22.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Hamburger Menu
-            IconButton(
-                onClick = onMenuClick,
-                modifier = Modifier.size(36.dp)
+            // Official BHP Logistics Logo in Rounded White Container
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(12.dp),
+                shadowElevation = 2.dp,
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onMenuClick() }
             ) {
-                HamburgerMenuIcon(
-                    tint = Color(0xFF0F172A),
-                    modifier = Modifier.size(24.dp)
+                Image(
+                    painter = painterResource(id = R.drawable.bhp_logo),
+                    contentDescription = "BHP Logistics Logo",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(2.dp)
                 )
             }
 
@@ -713,9 +789,9 @@ fun OwnerDashboardTopBar(
                 Text(
                     text = "BHP Logistics",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        color = Color(0xFF0F172A),
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
+                        fontSize = 19.sp,
                         letterSpacing = 0.2.sp
                     )
                 )
@@ -723,8 +799,9 @@ fun OwnerDashboardTopBar(
                 Text(
                     text = "Fleet Owner Dashboard",
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = Color(0xFF64748B),
-                        fontSize = 12.5.sp
+                        color = BhpMaroonSubtext,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal
                     )
                 )
             }
@@ -740,30 +817,29 @@ fun OwnerDashboardTopBar(
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = Color(0xFF10B981)
+                            color = BhpGold
                         )
                     } else {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh Fleet Data",
-                            tint = Color(0xFF0F172A),
+                            tint = Color.White,
                             modifier = Modifier.size(22.dp)
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
             }
 
             // Notification Bell with Badge
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
+                    .size(36.dp)
                     .clickable { onNotificationsClick() }
             ) {
                 NotificationBellIcon(
-                    tint = Color(0xFF0F172A),
+                    tint = Color.White,
                     hasBadge = unreadNotifications > 0,
                     modifier = Modifier.size(22.dp)
                 )
@@ -773,16 +849,13 @@ fun OwnerDashboardTopBar(
 }
 
 /**
- * Promotional / Welcome Banner with exactly 5 rotating slides,
- * smooth transitions, page dots, swipe support, and auto-rotation.
+ * Hero Welcome Banner: Real Compose Card with Commercial Lorry, Sunset Scenery,
+ * "Your Fleet, Your Control", Gold Pin, and 4-Slide Auto-Rotating Carousel.
  */
 private data class BannerSlide(
-    val title: String,
-    val subtitle: String,
-    val brush: Brush,
-    val titleColor: Color,
-    val subtitleColor: Color,
-    val icon: (@Composable () -> Unit)? = null
+    val titleTop: String,
+    val titleBottom: String,
+    val subtitle: String
 )
 
 @Composable
@@ -791,67 +864,25 @@ fun OwnerRotatingWelcomeBanner(
 ) {
     val slides = remember {
         listOf(
-            // Slide 1
             BannerSlide(
-                title = "Welcome Back,\nOwner 👋",
-                subtitle = "Manage your fleet with ease.",
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFFE8FDF0), Color(0xFFD1FAE5), Color(0xFFE0F2FE))
-                ),
-                titleColor = Color(0xFF0F172A),
-                subtitleColor = Color(0xFF059669)
+                titleTop = "Your Fleet,",
+                titleBottom = "Your Control",
+                subtitle = "Track every lorry in one place."
             ),
-            // Slide 2
             BannerSlide(
-                title = "Drive More,\nEarn More",
-                subtitle = "Smart Fleet. Smart Business.",
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF064E3B), Color(0xFF047857), Color(0xFF059669))
-                ),
-                titleColor = Color.White,
-                subtitleColor = Color(0xFFA7F3D0),
-                icon = {
-                    FinanceTrendingIcon(tint = Color(0xFF34D399), modifier = Modifier.size(26.dp))
-                }
+                titleTop = "Drive More,",
+                titleBottom = "Earn More",
+                subtitle = "Smart Fleet. Smart Business."
             ),
-            // Slide 3
             BannerSlide(
-                title = "Your Fleet,\nYour Control",
-                subtitle = "Track every lorry in one place.",
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF0369A1))
-                ),
-                titleColor = Color.White,
-                subtitleColor = Color(0xFFBAE6FD),
-                icon = {
-                    LocationPinIcon(tint = Color(0xFF38BDF8), modifier = Modifier.size(26.dp))
-                }
+                titleTop = "Keep Your",
+                titleBottom = "Business Moving",
+                subtitle = "Manage trips and drivers effortlessly."
             ),
-            // Slide 4
             BannerSlide(
-                title = "Keep Your\nBusiness Moving",
-                subtitle = "Manage trips and drivers effortlessly.",
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF14532D), Color(0xFF166534), Color(0xFF15803D))
-                ),
-                titleColor = Color.White,
-                subtitleColor = Color(0xFFBBF7D0),
-                icon = {
-                    DashboardTruckIcon(tint = Color(0xFF4ADE80), modifier = Modifier.size(26.dp))
-                }
-            ),
-            // Slide 5
-            BannerSlide(
-                title = "Smarter Fleet\nManagement",
-                subtitle = "Stay informed. Stay in control.",
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF0D9488))
-                ),
-                titleColor = Color.White,
-                subtitleColor = Color(0xFFE0E7FF),
-                icon = {
-                    ShieldVectorIcon(tint = Color(0xFF2DD4BF), modifier = Modifier.size(26.dp))
-                }
+                titleTop = "Real-Time",
+                titleBottom = "Live Tracking",
+                subtitle = "Monitor every kilometer on the road."
             )
         )
     }
@@ -875,66 +906,90 @@ fun OwnerRotatingWelcomeBanner(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(130.dp)
+                .height(138.dp)
         ) { page ->
             val slide = slides[page]
             Card(
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.8f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 2.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(slide.brush)
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Approved High-Res BHP Commercial Lorry Artwork
+                    Image(
+                        painter = painterResource(id = R.drawable.bhp_hero_banner),
+                        contentDescription = "BHP Logistics Hero Banner",
+                        contentScale = ContentScale.FillBounds,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // Prominent Gold Curve Swoosh at Bottom Left - visible on EVERY slide
+                    Canvas(
+                        modifier = Modifier
+                            .size(width = 145.dp, height = 28.dp)
+                            .align(Alignment.BottomStart)
                     ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            if (slide.icon != null) {
-                                slide.icon.invoke()
-                                Spacer(modifier = Modifier.height(4.dp))
-                            }
-                            Text(
-                                text = slide.title,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = slide.titleColor,
-                                    fontSize = 17.sp,
-                                    lineHeight = 22.sp
-                                )
+                        val path = Path().apply {
+                            moveTo(0f, size.height * 0.35f)
+                            cubicTo(
+                                size.width * 0.35f, size.height * 0.45f,
+                                size.width * 0.70f, size.height * 0.82f,
+                                size.width, size.height
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = slide.subtitle,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = slide.subtitleColor,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
+                            lineTo(0f, size.height)
+                            close()
                         }
+                        drawPath(path = path, color = BhpGold)
+                    }
 
-                        Spacer(modifier = Modifier.width(10.dp))
+                    // Slide Typography & Gold Pin (No ghost text!)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(start = 16.dp, end = 160.dp, top = 14.dp, bottom = 14.dp),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        LocationPinIcon(
+                            tint = BhpGold,
+                            modifier = Modifier.size(24.dp)
+                        )
 
-                        // Commercial Lorry Image
-                        Image(
-                            painter = painterResource(id = R.drawable.bhp_truck_highway),
-                            contentDescription = "BHP Commercial Lorry",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(width = 115.dp, height = 80.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = slide.titleTop,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                letterSpacing = (-0.2).sp
+                            ),
+                            maxLines = 1
+                        )
+
+                        Text(
+                            text = slide.titleBottom,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = BhpGold,
+                                fontSize = 17.sp,
+                                letterSpacing = (-0.2).sp
+                            ),
+                            maxLines = 1
+                        )
+
+                        Spacer(modifier = Modifier.height(3.dp))
+
+                        Text(
+                            text = slide.subtitle,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color.White.copy(alpha = 0.92f),
+                                fontSize = 10.5.sp,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                            ),
+                            maxLines = 1
                         )
                     }
                 }
@@ -943,19 +998,18 @@ fun OwnerRotatingWelcomeBanner(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Page Dots Indicator
+        // Page Dots Indicator: 4 dots, active dot is deep maroon #790018
         Row(
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             repeat(slides.size) { index ->
                 val isSelected = pagerState.currentPage == index
                 Box(
                     modifier = Modifier
-                        .height(5.dp)
-                        .width(if (isSelected) 18.dp else 5.dp)
+                        .size(if (isSelected) 8.dp else 6.dp)
                         .clip(CircleShape)
-                        .background(if (isSelected) Color(0xFF10B981) else Color(0xFFCBD5E1))
+                        .background(if (isSelected) BhpMaroonPrimary else Color(0xFFCBD5E1))
                 )
             }
         }
@@ -963,7 +1017,8 @@ fun OwnerRotatingWelcomeBanner(
 }
 
 /**
- * Circular Fleet Overview Card: Donut Chart + Filter + Status Rows with Real Counts.
+ * Circular Fleet Overview Card: Donut Chart + Filter + Status Rows + Truck Watermark.
+ * Designed to fit comfortably on any standard mobile viewport without text wrapping.
  */
 @Composable
 fun CircularFleetOverviewCard(
@@ -980,11 +1035,11 @@ fun CircularFleetOverviewCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header: "Fleet Overview" with chart icon + "This Month ▼"
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp)) {
+            // Header: "Fleet Overview" with 3-bar chart icon + "This Month ▼"
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -992,11 +1047,34 @@ fun CircularFleetOverviewCard(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(26.dp)
+                        .size(24.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFFDCFCE7))
+                        .background(Color(0xFFE8F5E9))
                 ) {
-                    Text("📊", fontSize = 13.sp)
+                    Canvas(modifier = Modifier.size(15.dp)) {
+                        val barW = 2.6.dp.toPx()
+                        // Bar 1: Red/Maroon
+                        drawRoundRect(
+                            color = Color(0xFFEF4444),
+                            topLeft = androidx.compose.ui.geometry.Offset(0f, size.height * 0.45f),
+                            size = androidx.compose.ui.geometry.Size(barW, size.height * 0.55f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+                        )
+                        // Bar 2: Dark green
+                        drawRoundRect(
+                            color = Color(0xFF15803D),
+                            topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.38f, size.height * 0.12f),
+                            size = androidx.compose.ui.geometry.Size(barW, size.height * 0.88f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+                        )
+                        // Bar 3: Bright green
+                        drawRoundRect(
+                            color = Color(0xFF10B981),
+                            topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.76f, size.height * 0.28f),
+                            size = androidx.compose.ui.geometry.Size(barW, size.height * 0.72f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -1004,35 +1082,35 @@ fun CircularFleetOverviewCard(
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A),
-                        fontSize = 17.sp
+                        fontSize = 15.sp
                     )
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // "This Month ▼" Filter Pill
+                // "This Month ▼" Filter Pill with Maroon Border
                 Box {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = Color.White,
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        border = BorderStroke(1.dp, BhpMaroonPrimary.copy(alpha = 0.7f)),
                         modifier = Modifier.clickable { isDropdownOpen = true }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = selectedFilter,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF0F172A)
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = BhpMaroonPrimary
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 text = "▼",
-                                fontSize = 8.sp,
-                                color = Color(0xFF64748B)
+                                fontSize = 7.sp,
+                                color = BhpMaroonPrimary
                             )
                         }
                     }
@@ -1054,26 +1132,25 @@ fun CircularFleetOverviewCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Body Row: Donut Chart on Left, 3 Status Items on Right
+            // Body Row: Donut Chart on Left, Status Counts in Middle, Brand Watermark on Right
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Donut Chart
+                // Donut Chart - Compact 86.dp to comfortably fit any phone screen
                 val total = fleetOverview.totalLorries
                 val runningSweep = if (total > 0) (fleetOverview.runningNow.toFloat() / total.toFloat()) * 360f else 0f
                 val readySweep = if (total > 0) (fleetOverview.readyToStart.toFloat() / total.toFloat()) * 360f else 0f
                 val notReadySweep = if (total > 0) (fleetOverview.notReady.toFloat() / total.toFloat()) * 360f else 0f
 
                 Box(
-                    modifier = Modifier.size(122.dp),
+                    modifier = Modifier.size(86.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Canvas(modifier = Modifier.fillMaxSize().padding(6.dp)) {
-                        val strokeWidth = 14.dp.toPx()
-                        // Track background
+                    Canvas(modifier = Modifier.fillMaxSize().padding(3.dp)) {
+                        val strokeWidth = 10.dp.toPx()
                         drawArc(
                             color = Color(0xFFF1F5F9),
                             startAngle = -90f,
@@ -1086,7 +1163,7 @@ fun CircularFleetOverviewCard(
                             var currentAngle = -90f
                             if (runningSweep > 0) {
                                 drawArc(
-                                    color = Color(0xFF10B981), // Green
+                                    color = Color(0xFF10B981), // Green: Running Now
                                     startAngle = currentAngle,
                                     sweepAngle = runningSweep,
                                     useCenter = false,
@@ -1096,7 +1173,7 @@ fun CircularFleetOverviewCard(
                             }
                             if (readySweep > 0) {
                                 drawArc(
-                                    color = Color(0xFFF59E0B), // Orange
+                                    color = Color(0xFFF59E0B), // Orange/Gold: Ready to Start
                                     startAngle = currentAngle,
                                     sweepAngle = readySweep,
                                     useCenter = false,
@@ -1106,7 +1183,7 @@ fun CircularFleetOverviewCard(
                             }
                             if (notReadySweep > 0) {
                                 drawArc(
-                                    color = Color(0xFF94A3B8), // Grey
+                                    color = Color(0xFF94A3B8), // Grey: Not Loaded
                                     startAngle = currentAngle,
                                     sweepAngle = notReadySweep,
                                     useCenter = false,
@@ -1122,13 +1199,13 @@ fun CircularFleetOverviewCard(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF0F172A),
-                                fontSize = 28.sp
+                                fontSize = 21.sp
                             )
                         )
                         Text(
                             text = "Total Lorries",
                             style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 10.5.sp,
+                                fontSize = 8.5.sp,
                                 color = Color(0xFF64748B),
                                 fontWeight = FontWeight.Medium
                             )
@@ -1136,14 +1213,13 @@ fun CircularFleetOverviewCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
-                // Status Column
+                // Middle: 3 Status Rows - guaranteed single-line fit on any device
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Running Now
                     FleetStatusRow(
                         color = Color(0xFF10B981),
                         label = "Running Now",
@@ -1152,8 +1228,6 @@ fun CircularFleetOverviewCard(
                         badgeTextColor = Color(0xFF15803D),
                         onClick = onRunningClick
                     )
-
-                    // Ready to Start
                     FleetStatusRow(
                         color = Color(0xFFF59E0B),
                         label = "Ready to Start",
@@ -1162,8 +1236,6 @@ fun CircularFleetOverviewCard(
                         badgeTextColor = Color(0xFFD97706),
                         onClick = onReadyClick
                     )
-
-                    // Not Loaded / Not Ready
                     FleetStatusRow(
                         color = Color(0xFF94A3B8),
                         label = "Not Loaded",
@@ -1172,6 +1244,60 @@ fun CircularFleetOverviewCard(
                         badgeTextColor = Color(0xFF475569),
                         onClick = onNotReadyClick
                     )
+                }
+
+                // Vertical Divider
+                Box(
+                    modifier = Modifier
+                        .height(72.dp)
+                        .width(1.dp)
+                        .background(Color(0xFFE2E8F0))
+                        .padding(horizontal = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Right: Watermark Branding Column - Compact width (76.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.width(76.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.bhp_truck_watermark),
+                        contentDescription = "BHP Watermark",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .size(width = 62.dp, height = 30.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "BHP Logistics",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = BhpMaroonPrimary,
+                            fontSize = 10.sp
+                        ),
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "Move Forward Together...",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF0F172A),
+                            fontSize = 6.5.sp
+                        ),
+                        maxLines = 1
+                    )
+                    Canvas(modifier = Modifier.size(width = 44.dp, height = 3.dp)) {
+                        val path = Path().apply {
+                            moveTo(0f, size.height * 0.5f)
+                            quadraticTo(size.width * 0.5f, size.height, size.width, 0f)
+                        }
+                        drawPath(path = path, color = BhpGold, style = Stroke(width = 1.5.dp.toPx()))
+                    }
                 }
             }
         }
@@ -1193,26 +1319,30 @@ private fun FleetStatusRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .clickable { onClick() }
-            .padding(vertical = 2.dp)
+            .padding(vertical = 1.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(10.dp)
+                .size(8.dp)
                 .clip(CircleShape)
                 .background(color)
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 13.sp,
+                fontSize = 11.5.sp,
                 color = Color(0xFF1E293B),
                 fontWeight = FontWeight.Medium
             ),
+            maxLines = 1,
+            softWrap = false,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        Spacer(modifier = Modifier.width(4.dp))
         Surface(
-            shape = RoundedCornerShape(6.dp),
+            shape = RoundedCornerShape(5.dp),
             color = badgeBg
         ) {
             Text(
@@ -1220,9 +1350,9 @@ private fun FleetStatusRow(
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
                     color = badgeTextColor,
-                    fontSize = 12.sp
+                    fontSize = 10.5.sp
                 ),
-                modifier = Modifier.padding(horizontal = 9.dp, vertical = 2.dp)
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
             )
         }
     }
@@ -1255,8 +1385,10 @@ fun DashboardFinancialCardsGrid(
                 trend = financialSummary.totalTripsTrend,
                 iconBg = Color(0xFFDCFCE7),
                 icon = {
-                    LocationPinIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(20.dp))
+                    LocationPinIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(19.dp))
                 },
+                accentColor = Color(0xFF10B981),
+                chartType = 0,
                 onClick = onTripsClick,
                 modifier = Modifier.weight(1f)
             )
@@ -1269,6 +1401,8 @@ fun DashboardFinancialCardsGrid(
                 icon = {
                     Text("₹", color = Color(0xFF0284C7), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 },
+                accentColor = Color(0xFF0284C7),
+                chartType = 1,
                 onClick = onIncomeClick,
                 modifier = Modifier.weight(1f)
             )
@@ -1285,8 +1419,10 @@ fun DashboardFinancialCardsGrid(
                 trend = financialSummary.expensesTrend,
                 iconBg = Color(0xFFFEE2E2),
                 icon = {
-                    WrenchToolIcon(tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
+                    WrenchToolIcon(tint = Color(0xFFEF4444), modifier = Modifier.size(17.dp))
                 },
+                accentColor = Color(0xFFEF4444),
+                chartType = 1,
                 onClick = onExpensesClick,
                 modifier = Modifier.weight(1f)
             )
@@ -1297,8 +1433,10 @@ fun DashboardFinancialCardsGrid(
                 trend = financialSummary.profitTrend,
                 iconBg = Color(0xFFDCFCE7),
                 icon = {
-                    FinanceTrendingIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(19.dp))
+                    FinanceTrendingIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(18.dp))
                 },
+                accentColor = Color(0xFF10B981),
+                chartType = 1,
                 onClick = onProfitClick,
                 modifier = Modifier.weight(1f)
             )
@@ -1313,6 +1451,8 @@ fun FinancialMetricTile(
     trend: String,
     iconBg: Color,
     icon: @Composable () -> Unit,
+    accentColor: Color,
+    chartType: Int, // 0 = wave, 1 = bars
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1325,152 +1465,189 @@ fun FinancialMetricTile(
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Subtle graphic in bottom-right corner
+            Canvas(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(iconBg)
+                    .size(width = 48.dp, height = 36.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 4.dp, bottom = 4.dp)
             ) {
-                icon()
+                val w = size.width
+                val h = size.height
+                if (chartType == 0) {
+                    val wavePath = Path().apply {
+                        moveTo(0f, h * 0.85f)
+                        quadraticTo(w * 0.35f, h * 0.2f, w * 0.7f, h * 0.6f)
+                        quadraticTo(w * 0.85f, h * 0.8f, w, h * 0.15f)
+                        lineTo(w, h)
+                        lineTo(0f, h)
+                        close()
+                    }
+                    drawPath(
+                        path = wavePath,
+                        brush = Brush.verticalGradient(
+                            listOf(accentColor.copy(alpha = 0.25f), accentColor.copy(alpha = 0.05f))
+                        )
+                    )
+                } else {
+                    val barWidth = 6.dp.toPx()
+                    val gap = 4.dp.toPx()
+                    val heights = listOf(0.4f, 0.7f, 1.0f)
+                    var xOffset = w - (3 * barWidth + 2 * gap)
+                    for (barH in heights) {
+                        drawRoundRect(
+                            color = accentColor.copy(alpha = 0.35f * barH),
+                            topLeft = androidx.compose.ui.geometry.Offset(xOffset, h * (1f - barH)),
+                            size = androidx.compose.ui.geometry.Size(barWidth, h * barH),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                        )
+                        xOffset += barWidth + gap
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(iconBg)
+                ) {
+                    icon()
+                }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = Color(0xFF64748B),
-                        fontSize = 11.5.sp
-                    ),
-                    maxLines = 1
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        fontSize = 14.5.sp,
-                        letterSpacing = (-0.3).sp
-                    ),
-                    maxLines = 1
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = trend,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF16A34A),
-                        fontSize = 10.5.sp
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = Color(0xFF64748B),
+                            fontSize = 11.5.sp
+                        ),
+                        maxLines = 1
                     )
-                )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A),
+                            fontSize = 15.sp,
+                            letterSpacing = (-0.3).sp
+                        ),
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = trend,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF16A34A),
+                            fontSize = 11.sp
+                        )
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * Quick Actions Section: Deep Emerald Banner + 2-Column Grid of 6 Action Tiles.
+ * Quick Actions Section: Exactly Three Shortcuts (Add Trip, Manage Drivers, My Lorries).
+ * Branded Deep Maroon Header Container with View All in Gold.
  */
 @Composable
 fun QuickActionsSection(
     onAddTripClick: () -> Unit,
     onManageDriversClick: () -> Unit,
-    onMaintenanceClick: () -> Unit,
-    onFinanceClick: () -> Unit,
     onMyLorriesClick: () -> Unit,
-    onLiveTrackingClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = BhpMaroonPrimary),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier.fillMaxWidth()
     ) {
-        // Emerald Green Header Banner matching reference design
-        Surface(
-            color = Color(0xFF047857), // Deep emerald green
-            shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
         ) {
+            // Header Row: Lightning bolt + "Quick Actions" on left, "View All →" in gold on right
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 4.dp)
             ) {
-                Text("⚡", fontSize = 14.sp)
+                Text("⚡", fontSize = 15.sp)
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Quick Actions",
-                    style = MaterialTheme.typography.titleSmall.copy(
+                    style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontSize = 14.5.sp,
+                        fontSize = 15.sp,
                         letterSpacing = 0.2.sp
                     )
                 )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Text(
+                    text = "View All →",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = BhpGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp
+                    ),
+                    modifier = Modifier
+                        .clickable { onMyLorriesClick() }
+                        .padding(4.dp)
+                )
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-        // 2-column Grid of 6 Action Tiles
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // Column 1
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
+            // Exactly THREE Equal-width Action Cards in a single row
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                QuickActionTile(
+                // 1. Add Trip
+                QuickActionCard(
                     title = "Add Trip",
-                    iconBg = Color(0xFFDCFCE7),
-                    icon = { Text("+", color = Color(0xFF16A34A), fontSize = 18.sp, fontWeight = FontWeight.Bold) },
-                    onClick = onAddTripClick
-                )
-                QuickActionTile(
-                    title = "Maintenance",
-                    iconBg = Color(0xFFFFEDD5),
-                    icon = { WrenchToolIcon(tint = Color(0xFFEA580C), modifier = Modifier.size(16.dp)) },
-                    onClick = onMaintenanceClick
-                )
-                QuickActionTile(
-                    title = "My Lorries",
-                    iconBg = Color(0xFFDBEAFE),
-                    icon = { DashboardTruckIcon(tint = Color(0xFF2563EB), modifier = Modifier.size(16.dp)) },
-                    onClick = onMyLorriesClick
-                )
-            }
-
-            // Column 2
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                QuickActionTile(
-                    title = "Manage Drivers",
-                    iconBg = Color(0xFFEFF6FF),
-                    icon = { DriverCapIcon(tint = Color(0xFF2563EB), modifier = Modifier.size(16.dp)) },
-                    onClick = onManageDriversClick
-                )
-                QuickActionTile(
-                    title = "Finance",
-                    iconBg = Color(0xFFECFDF5),
-                    icon = { FinanceTrendingIcon(tint = Color(0xFF059669), modifier = Modifier.size(16.dp)) },
-                    onClick = onFinanceClick
-                )
-                QuickActionTile(
-                    title = "Live Tracking",
+                    icon = { Text("+", color = Color(0xFF0284C7), fontSize = 22.sp, fontWeight = FontWeight.Bold) },
                     iconBg = Color(0xFFE0F2FE),
-                    icon = { LocationPinIcon(tint = Color(0xFF0284C7), modifier = Modifier.size(16.dp)) },
-                    onClick = onLiveTrackingClick
+                    onClick = onAddTripClick,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // 2. Manage Drivers
+                QuickActionCard(
+                    title = "Manage Drivers",
+                    icon = { DriverCapIcon(tint = Color(0xFF16A34A), modifier = Modifier.size(20.dp)) },
+                    iconBg = Color(0xFFDCFCE7),
+                    onClick = onManageDriversClick,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // 3. My Lorries
+                QuickActionCard(
+                    title = "My Lorries",
+                    icon = { DashboardTruckIcon(tint = Color(0xFFD97706), modifier = Modifier.size(20.dp)) },
+                    iconBg = Color(0xFFFEF3C7),
+                    onClick = onMyLorriesClick,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -1478,52 +1655,47 @@ fun QuickActionsSection(
 }
 
 @Composable
-fun QuickActionTile(
+fun QuickActionCard(
     title: String,
-    iconBg: Color,
     icon: @Composable () -> Unit,
+    iconBg: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        color = Color.White,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        shadowElevation = 1.dp,
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = modifier
-            .fillMaxWidth()
-            .height(52.dp)
+            .height(86.dp)
             .clickable { onClick() }
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp)
+                .padding(6.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(iconBg)
             ) {
                 icon()
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyMedium.copy(
+                style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF0F172A),
-                    fontSize = 13.sp
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
                 ),
-                maxLines = 1,
-                modifier = Modifier.weight(1f)
-            )
-            ChevronRightIcon(
-                tint = Color(0xFF94A3B8),
-                modifier = Modifier.size(16.dp)
+                maxLines = 1
             )
         }
     }
@@ -2434,7 +2606,7 @@ fun ActivityCard(
 }
 
 /**
- * Bottom Navigation Bar matching the 5 tabs in the reference design.
+ * Bottom Navigation Bar matching the approved BHP Logistics Maroon & Gold reference design.
  */
 @Composable
 fun OwnerBottomNavBar(
@@ -2442,59 +2614,71 @@ fun OwnerBottomNavBar(
     onSelectIndex: (Int) -> Unit
 ) {
     Surface(
-        color = BhpCardWhite,
-        shadowElevation = 8.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, BhpCardBorder.copy(alpha = 0.6f), RoundedCornerShape(0.dp))
+        color = BhpMaroonPrimary,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shadowElevation = 10.dp,
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp),
+                .navigationBarsPadding()
+                .padding(horizontal = 6.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 1. Home
             BottomNavItem(
                 label = "Home",
                 isSelected = selectedIndex == 0,
-                icon = { HomeNavIcon(tint = if (selectedIndex == 0) BhpRunningGreen else BhpTextSecondary, modifier = Modifier.size(20.dp)) },
+                icon = { HomeNavIcon(tint = if (selectedIndex == 0) BhpMaroonPrimary else Color.White, modifier = Modifier.size(20.dp)) },
                 onClick = { onSelectIndex(0) },
                 modifier = Modifier.weight(1f)
             )
+
+            // Divider
+            Box(modifier = Modifier.height(20.dp).width(1.dp).background(Color.White.copy(alpha = 0.2f)))
 
             // 2. Tracking
             BottomNavItem(
                 label = "Tracking",
                 isSelected = selectedIndex == 1,
-                icon = { LocationPinIcon(tint = if (selectedIndex == 1) BhpRunningGreen else BhpTextSecondary, modifier = Modifier.size(20.dp)) },
+                icon = { LocationPinIcon(tint = if (selectedIndex == 1) BhpMaroonPrimary else Color.White, modifier = Modifier.size(20.dp)) },
                 onClick = { onSelectIndex(1) },
                 modifier = Modifier.weight(1f)
             )
+
+            // Divider
+            Box(modifier = Modifier.height(20.dp).width(1.dp).background(Color.White.copy(alpha = 0.2f)))
 
             // 3. Maintenance
             BottomNavItem(
                 label = "Maintenance",
                 isSelected = selectedIndex == 2,
-                icon = { WrenchToolIcon(tint = if (selectedIndex == 2) BhpRunningGreen else BhpTextSecondary, modifier = Modifier.size(20.dp)) },
+                icon = { WrenchToolIcon(tint = if (selectedIndex == 2) BhpMaroonPrimary else Color.White, modifier = Modifier.size(20.dp)) },
                 onClick = { onSelectIndex(2) },
                 modifier = Modifier.weight(1f)
             )
+
+            // Divider
+            Box(modifier = Modifier.height(20.dp).width(1.dp).background(Color.White.copy(alpha = 0.2f)))
 
             // 4. Finance
             BottomNavItem(
                 label = "Finance",
                 isSelected = selectedIndex == 3,
-                icon = { FinanceTrendingIcon(tint = if (selectedIndex == 3) BhpRunningGreen else BhpTextSecondary, modifier = Modifier.size(20.dp)) },
+                icon = { FinanceTrendingIcon(tint = if (selectedIndex == 3) BhpMaroonPrimary else Color.White, modifier = Modifier.size(20.dp)) },
                 onClick = { onSelectIndex(3) },
                 modifier = Modifier.weight(1f)
             )
+
+            // Divider
+            Box(modifier = Modifier.height(20.dp).width(1.dp).background(Color.White.copy(alpha = 0.2f)))
 
             // 5. More
             BottomNavItem(
                 label = "More",
                 isSelected = selectedIndex == 4,
-                icon = { MoreDotsIcon(tint = if (selectedIndex == 4) BhpRunningGreen else BhpTextSecondary, modifier = Modifier.size(18.dp)) },
+                icon = { MoreDotsIcon(tint = if (selectedIndex == 4) BhpMaroonPrimary else Color.White, modifier = Modifier.size(18.dp)) },
                 onClick = { onSelectIndex(4) },
                 modifier = Modifier.weight(1f)
             )
@@ -2518,9 +2702,9 @@ fun BottomNavItem(
     ) {
         if (isSelected) {
             Surface(
-                color = BhpRunningGreenBg,
+                color = BhpGold,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.size(width = 46.dp, height = 28.dp)
+                modifier = Modifier.size(width = 54.dp, height = 30.dp)
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     icon()
@@ -2529,7 +2713,7 @@ fun BottomNavItem(
         } else {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(width = 46.dp, height = 28.dp)
+                modifier = Modifier.size(width = 54.dp, height = 30.dp)
             ) {
                 icon()
             }
@@ -2540,10 +2724,9 @@ fun BottomNavItem(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) BhpRunningGreen else BhpTextSecondary,
-                fontSize = 9.sp,
-                letterSpacing = (-0.3).sp
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) BhpGold else Color.White,
+                fontSize = 10.sp
             ),
             softWrap = false,
             maxLines = 1
