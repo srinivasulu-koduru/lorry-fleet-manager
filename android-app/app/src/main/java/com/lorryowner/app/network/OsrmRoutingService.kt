@@ -233,6 +233,28 @@ object OsrmRoutingService {
     }
 
     /**
+     * Projects point [p] perpendicularly onto line segment [a, b].
+     * Clamps projection strictly within segment bounds [0.0, 1.0].
+     */
+    fun projectPointOnSegment(p: LatLng, a: LatLng, b: LatLng): LatLng {
+        val midLat = Math.toRadians((a.latitude + b.latitude) / 2.0)
+        val cosMidLat = cos(midLat)
+        val dx = Math.toRadians(b.longitude - a.longitude) * cosMidLat
+        val dy = Math.toRadians(b.latitude - a.latitude)
+        val lenSq = dx * dx + dy * dy
+        if (lenSq < 1e-12) return a
+
+        val px = Math.toRadians(p.longitude - a.longitude) * cosMidLat
+        val py = Math.toRadians(p.latitude - a.latitude)
+        val t = max(0.0, min(1.0, (px * dx + py * dy) / lenSq))
+
+        return LatLng(
+            a.latitude + t * (b.latitude - a.latitude),
+            a.longitude + t * (b.longitude - a.longitude)
+        )
+    }
+
+    /**
      * Pure mathematical Haversine distance in meters.
      * Safe for both JVM unit tests and Android runtime without Location dependency.
      */
@@ -248,8 +270,82 @@ object OsrmRoutingService {
     }
 
     /**
+     * Calculates the exact remaining road distance in kilometres from the current vehicle location
+     * to the destination along the planned OSRM road geometry.
+     * Snaps the current position to the nearest road segment, sums remaining road polyline lengths,
+     * and excludes already-travelled segments.
+     *
+     * Returns kilometres with 1 decimal precision (e.g. 142.3 km).
+     */
+    fun calculateRemainingRoadDistanceKm(
+        currentLocation: LatLng,
+        fullRoute: List<LatLng>
+    ): Double {
+        if (fullRoute.isEmpty()) return 0.0
+        if (fullRoute.size == 1) {
+            val dist = haversineDistanceMeters(
+                currentLocation.latitude, currentLocation.longitude,
+                fullRoute[0].latitude, fullRoute[0].longitude
+            )
+            return Math.round((dist / 1000.0) * 10.0) / 10.0
+        }
+
+        var minDistance = Double.MAX_VALUE
+        var closestSegmentIndex = 0
+
+        for (i in 0 until fullRoute.size - 1) {
+            val p1 = fullRoute[i]
+            val p2 = fullRoute[i + 1]
+            val dist = distanceToSegmentMeters(currentLocation, p1, p2)
+            if (dist < minDistance) {
+                minDistance = dist
+                closestSegmentIndex = i
+            }
+        }
+
+        val snapped = projectPointOnSegment(
+            currentLocation,
+            fullRoute[closestSegmentIndex],
+            fullRoute[closestSegmentIndex + 1]
+        )
+
+        // 1. Distance from snapped point to the next waypoint on the route
+        var remMeters = haversineDistanceMeters(
+            snapped.latitude, snapped.longitude,
+            fullRoute[closestSegmentIndex + 1].latitude, fullRoute[closestSegmentIndex + 1].longitude
+        )
+
+        // 2. Perpendicular deviation offset from current vehicle location to snapped road point
+        if (minDistance > 10.0) {
+            remMeters += minDistance
+        }
+
+        // 3. Sum all remaining road segments to the destination
+        for (i in (closestSegmentIndex + 1) until (fullRoute.size - 1)) {
+            remMeters += haversineDistanceMeters(
+                fullRoute[i].latitude, fullRoute[i].longitude,
+                fullRoute[i + 1].latitude, fullRoute[i + 1].longitude
+            )
+        }
+
+        // Destination reached threshold (< 50m)
+        val dest = fullRoute.last()
+        val distToDest = haversineDistanceMeters(
+            currentLocation.latitude, currentLocation.longitude,
+            dest.latitude, dest.longitude
+        )
+        if (distToDest < 50.0 || remMeters < 50.0) {
+            return 0.0
+        }
+
+        val remKm = remMeters / 1000.0
+        return Math.max(0.1, Math.round(remKm * 10.0) / 10.0)
+    }
+
+    /**
      * Slices the planned road route to only include the remaining path from the current
-     * position forward to the destination. Removes all route segments already passed.
+     * position forward to the destination. Snaps current position to the road and removes
+     * all route segments already passed.
      *
      * This ensures the BLUE line only shows the remaining route, while the GREEN line
      * shows the actual travelled breadcrumbs, keeping the two visually distinct.
@@ -274,17 +370,19 @@ object OsrmRoutingService {
             }
         }
 
-        // If vehicle is reasonably near the road route (within 500m), slice from closest segment forward
-        return if (minDistance <= 500.0) {
-            if (closestSegmentIndex + 1 < fullRoute.size) {
-                listOf(currentLocation) + fullRoute.subList(closestSegmentIndex + 1, fullRoute.size)
-            } else {
-                listOf(currentLocation, fullRoute.last())
-            }
+        val snapped = projectPointOnSegment(
+            currentLocation,
+            fullRoute[closestSegmentIndex],
+            fullRoute[closestSegmentIndex + 1]
+        )
+
+        val forwardSublist = if (closestSegmentIndex + 1 < fullRoute.size) {
+            fullRoute.subList(closestSegmentIndex + 1, fullRoute.size)
         } else {
-            // Vehicle has deviated; connect vehicle to the full remaining planned route
-            listOf(currentLocation) + fullRoute
+            emptyList()
         }
+
+        return listOf(currentLocation, snapped) + forwardSublist
     }
 
     /**

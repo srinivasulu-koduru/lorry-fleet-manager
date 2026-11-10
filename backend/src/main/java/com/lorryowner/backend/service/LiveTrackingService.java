@@ -246,16 +246,24 @@ public class LiveTrackingService {
         }
 
         // Distance & ETA calculation
-        double totalDistanceKm = trip.getDistanceKm() != null ? trip.getDistanceKm().doubleValue() : 430.0;
+        double[] destCoords = resolveCoordinatesForCity(trip.getDestinationLocation());
+        double[] originCoords = resolveCoordinatesForCity(trip.getOriginLocation());
+        double fullHaversine = calculateHaversineKm(originCoords[0], originCoords[1], destCoords[0], destCoords[1]);
+        double totalDistanceKm = trip.getDistanceKm() != null ? trip.getDistanceKm().doubleValue() : Math.round(fullHaversine * 1.25 * 10.0) / 10.0;
         double travelledKm;
         double remainingKm;
 
         if (hasGpsFix) {
-            double[] originCoords = resolveCoordinatesForCity(trip.getOriginLocation());
+            double haversineToDest = calculateHaversineKm(lat, lon, destCoords[0], destCoords[1]);
+            // Road curvature factor from current GPS position to destination (standard ~1.22x)
+            remainingKm = Math.max(0.0, Math.round(haversineToDest * 1.22 * 10.0) / 10.0);
+
             double haversineFromOrigin = calculateHaversineKm(originCoords[0], originCoords[1], lat, lon);
-            // Road factor is typically ~1.15 to 1.25x straight-line distance
-            travelledKm = Math.min(totalDistanceKm, Math.max(0.0, Math.round(haversineFromOrigin * 1.20 * 10.0) / 10.0));
-            remainingKm = Math.max(0.0, Math.round((totalDistanceKm - travelledKm) * 10.0) / 10.0);
+            travelledKm = Math.max(0.0, Math.round(haversineFromOrigin * 1.20 * 10.0) / 10.0);
+
+            if (totalDistanceKm > 0 && remainingKm > totalDistanceKm) {
+                remainingKm = totalDistanceKm;
+            }
         } else {
             travelledKm = 0.0;
             remainingKm = totalDistanceKm;

@@ -178,12 +178,19 @@ class LiveTrackingViewModel(
             Pair(false, 0.0)
         }
 
+        val computedRemainingKm = if (finalRoute.isNotEmpty() && truckLat != null && truckLon != null) {
+            OsrmRoutingService.calculateRemainingRoadDistanceKm(LatLng(truckLat, truckLon), finalRoute)
+        } else {
+            parsed.remainingDistanceKm
+        }
+
         return parsed.copy(
             plannedRoadRoute = finalRoute,
             originLatitude = originLat,
             originLongitude = originLon,
             destinationLatitude = destLat,
             destinationLongitude = destLon,
+            remainingDistanceKm = if (computedRemainingKm > 0.0) computedRemainingKm else parsed.remainingDistanceKm,
             isRouteDeviated = isDeviated,
             deviationDistanceKm = devDistKm
         )

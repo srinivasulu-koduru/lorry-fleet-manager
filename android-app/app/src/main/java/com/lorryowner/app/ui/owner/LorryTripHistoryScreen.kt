@@ -3,9 +3,11 @@ package com.lorryowner.app.ui.owner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -42,6 +44,10 @@ fun LorryTripHistoryScreen(
     val state = viewModel.uiState
     var tripToCancel by remember { mutableStateOf<TripItemUiState?>(null) }
 
+    LaunchedEffect(lorryId) {
+        viewModel.loadTripsOnly()
+    }
+
     Scaffold(
         topBar = {
             Surface(
@@ -72,7 +78,7 @@ fun LorryTripHistoryScreen(
                         ),
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(onClick = { viewModel.loadData() }) {
+                    IconButton(onClick = { viewModel.loadTripsOnly() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh",
@@ -91,9 +97,12 @@ fun LorryTripHistoryScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // Filter chips: All, Completed, In Progress, Cancelled
+            // Filter chips: All, Completed, In Progress, Cancelled (Horizontally scrollable row)
+            val filterScrollState = rememberScrollState()
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(filterScrollState),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
@@ -120,9 +129,45 @@ fun LorryTripHistoryScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            if (state.isLoading) {
+            if (state.isLoading && state.trips.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = BhpDarkForestGreen)
+                }
+            } else if (state.errorMessage != null && state.trips.isEmpty()) {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = CardDefaults.outlinedCardBorder(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("⚠️", fontSize = 36.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Failed to load trips",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = state.errorMessage ?: "Network or server connection error.",
+                            fontSize = 13.sp,
+                            color = BhpTextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.loadTripsOnly() },
+                            colors = ButtonDefaults.buttonColors(containerColor = BhpNavyDark),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Retry", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             } else if (state.filteredTrips.isEmpty()) {
                 Card(
@@ -155,7 +200,7 @@ fun LorryTripHistoryScreen(
             } else {
                 BhpPullToRefreshBox(
                     isRefreshing = state.isLoading,
-                    onRefresh = { viewModel.loadData() },
+                    onRefresh = { viewModel.loadTripsOnly() },
                     modifier = Modifier.fillMaxSize()
                 ) {
                     LazyColumn(

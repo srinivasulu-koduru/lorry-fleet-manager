@@ -607,9 +607,12 @@ fun DriverLiveRouteMapCard(
                 }
 
                 matchingState.selectedRoute?.let { route ->
-                    val km = (route.distanceMeters / 1000.0).roundToInt()
+                    val totalKm = (route.distanceMeters / 1000.0).roundToInt()
+                    val remKm = latestGpsLocation?.let { loc ->
+                        OsrmRoutingService.calculateRemainingRoadDistanceKm(LatLng(loc.latitude, loc.longitude), route.points)
+                    } ?: (route.distanceMeters / 1000.0)
                     Text(
-                        text = "$km km planned",
+                        text = "${String.format(java.util.Locale.US, "%.1f", remKm)} km remaining • $totalKm km total",
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.5.sp,
                         color = Color(0xFF0F172A)

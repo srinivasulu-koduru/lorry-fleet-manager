@@ -862,8 +862,15 @@ fun BottomTripInfoPanel(
                             Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
                                 Text("Remaining", fontSize = 10.5.sp, color = BhpTextSecondary)
                                 Spacer(modifier = Modifier.height(2.dp))
+                                val remainingKm = if (data.remainingDistanceKm > 0.0) {
+                                    data.remainingDistanceKm
+                                } else if (data.latitude != null && data.longitude != null && data.plannedRoadRoute.isNotEmpty()) {
+                                    OsrmRoutingService.calculateRemainingRoadDistanceKm(LatLng(data.latitude, data.longitude), data.plannedRoadRoute)
+                                } else {
+                                    0.0
+                                }
                                 Text(
-                                    text = if (data.remainingDistanceKm > 0) TrackingFormattingHelper.formatDistance(data.remainingDistanceKm) else "--",
+                                    text = if (remainingKm > 0) TrackingFormattingHelper.formatDistance(remainingKm) else "--",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = BhpTextPrimary,

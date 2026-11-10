@@ -117,6 +117,7 @@ class DriverTripTrackingService : Service(), LocationListener {
     private var wakeLock: PowerManager.WakeLock? = null
 
     private val gpsFilter = StationaryGpsFilter()
+    private val speedCalculator = GpsSpeedCalculator()
 
     override fun onCreate() {
         super.onCreate()
@@ -320,6 +321,7 @@ class DriverTripTrackingService : Service(), LocationListener {
                 return
             }
             is GpsFilterResult.SuppressStationaryJitter -> {
+                speedCalculator.calculateSpeedKmh(location, isStationaryAnchor = true)
                 // Keep UI lorry marker anchored to the stable stop coordinate with speed clamped to 0
                 val stableLocation = Location(location).apply {
                     latitude = filterResult.anchoredLat
@@ -332,7 +334,7 @@ class DriverTripTrackingService : Service(), LocationListener {
                 _latestLocation.value = stableLocation
 
                 if (!filterResult.shouldEmitHeartbeat) {
-                    Log.d(TAG, "Suppressed stationary GPS jitter: dist=${filterResult.displacementFromAnchor.toInt()}m, speed=${filterResult.speedKmh} km/h")
+                    Log.d(TAG, "Suppressed stationary GPS jitter: dist=${filterResult.displacementFromAnchor.toInt()}m, speed=0.0 km/h")
                     return
                 }
 
@@ -341,12 +343,16 @@ class DriverTripTrackingService : Service(), LocationListener {
                 transmitLocation(stableLocation, speedKmh = 0.0)
             }
             is GpsFilterResult.AcceptGenuineMovement -> {
-                _latestLocation.value = location
+                val accurateSpeedKmh = speedCalculator.calculateSpeedKmh(location, isStationaryAnchor = false)
+                val enrichedLocation = Location(location).apply {
+                    speed = accurateSpeedKmh / 3.6f
+                }
+                _latestLocation.value = enrichedLocation
                 val currentHistory = _recentLocations.value
-                _recentLocations.value = (currentHistory + location).takeLast(40)
+                _recentLocations.value = (currentHistory + enrichedLocation).takeLast(40)
 
-                Log.d(TAG, "Accepted genuine movement: dist=${filterResult.displacement.toInt()}m, speed=${filterResult.speedKmh} km/h, acc=${location.accuracy}m")
-                transmitLocation(location, speedKmh = filterResult.speedKmh.toDouble())
+                Log.d(TAG, "Accepted genuine movement: dist=${filterResult.displacement.toInt()}m, speed=${accurateSpeedKmh} km/h, acc=${location.accuracy}m")
+                transmitLocation(enrichedLocation, speedKmh = accurateSpeedKmh.toDouble())
             }
         }
     }
@@ -495,6 +501,7 @@ class DriverTripTrackingService : Service(), LocationListener {
 
     private fun stopTrackingInternal() {
         gpsFilter.reset()
+        speedCalculator.reset()
         _isTrackingActive.value = false
         _currentTrackingTripId.value = null
         _latestLocation.value = null
