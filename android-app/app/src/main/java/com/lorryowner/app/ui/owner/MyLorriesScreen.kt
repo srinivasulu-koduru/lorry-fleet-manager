@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.security.SessionManager
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.DashboardTruckIcon
 import com.lorryowner.app.ui.components.DriverCapIcon
 import com.lorryowner.app.ui.components.LocationPinIcon
@@ -100,11 +101,16 @@ fun MyLorriesScreen(
                     CircularProgressIndicator(color = BhpDarkForestGreen)
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                BhpPullToRefreshBox(
+                    isRefreshing = state.isLoading,
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.fillMaxSize()
                 ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
                     // 1. Circular Fleet Status Chart Card
                     item {
                         CircularFleetStatusCard(
@@ -275,6 +281,7 @@ fun MyLorriesScreen(
                     }
                 }
             }
+        }
         }
     }
 }

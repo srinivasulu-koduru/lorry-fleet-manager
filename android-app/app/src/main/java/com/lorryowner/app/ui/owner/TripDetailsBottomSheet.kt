@@ -101,6 +101,9 @@ fun TripDetailsBottomSheet(
             TrackingDetailItem(label = "Starting Location", value = data.originLocation)
             TrackingDetailItem(label = "Current Location", value = data.currentLocationDescription)
             TrackingDetailItem(label = "Destination", value = data.destinationLocation)
+            if (!data.tripAmountFormatted.isNullOrBlank()) {
+                TrackingDetailItem(label = "Trip Freight Amount", value = data.tripAmountFormatted)
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = Color(0xFFF1F5F9))

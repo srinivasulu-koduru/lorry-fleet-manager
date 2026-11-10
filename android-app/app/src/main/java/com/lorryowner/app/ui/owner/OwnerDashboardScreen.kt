@@ -42,7 +42,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import com.lorryowner.app.R
 import com.lorryowner.app.security.SessionManager
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.CheckmarkCircleIcon
 import com.lorryowner.app.ui.components.ChevronRightIcon
 import com.lorryowner.app.ui.components.ClockTimerIcon
@@ -177,6 +182,21 @@ fun OwnerDashboardScreen(
     LaunchedEffect(currentDestination) {
         if (currentDestination == OwnerDestination.DASHBOARD) {
             viewModel.refreshDashboard()
+        }
+    }
+
+    // Auto-refresh dashboard metrics when returning to the application from background (ON_RESUME)
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (currentDestination == OwnerDestination.DASHBOARD) {
+                    viewModel.refreshDashboard()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -570,18 +590,25 @@ private fun DashboardMainScaffold(
             OwnerDashboardTopBar(
                 onMenuClick = { viewModel.showProfileDialog() },
                 unreadNotifications = state.unreadNotificationsCount,
-                onNotificationsClick = { viewModel.showProfileDialog() }
+                onNotificationsClick = { viewModel.showProfileDialog() },
+                onRefreshClick = { viewModel.refreshDashboard() },
+                isRefreshing = state.isRefreshing
             )
 
-            // 2. Scrollable Body
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            // 2. Scrollable Body with Pull-to-refresh
+            BhpPullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { viewModel.refreshDashboard() },
+                modifier = Modifier.fillMaxSize()
             ) {
-                // A. Automatic Rotating Welcome Banner (Rule 3 - 5 Slides, Auto-looping, Dots)
-                OwnerRotatingWelcomeBanner()
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    // A. Automatic Rotating Welcome Banner (Rule 3 - 5 Slides, Auto-looping, Dots)
+                    OwnerRotatingWelcomeBanner()
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -620,6 +647,7 @@ private fun DashboardMainScaffold(
             }
         }
     }
+    }
 
     // Modal Dialog: Fleet Lorries Inspector
     if (state.isLorriesDialogVisible) {
@@ -651,7 +679,9 @@ private fun DashboardMainScaffold(
 fun OwnerDashboardTopBar(
     onMenuClick: () -> Unit,
     unreadNotifications: Int,
-    onNotificationsClick: () -> Unit = onMenuClick
+    onNotificationsClick: () -> Unit = onMenuClick,
+    onRefreshClick: (() -> Unit)? = null,
+    isRefreshing: Boolean = false
 ) {
     Surface(
         color = Color.White,
@@ -697,6 +727,31 @@ fun OwnerDashboardTopBar(
                         fontSize = 12.5.sp
                     )
                 )
+            }
+
+            // Quick Refresh Action
+            if (onRefreshClick != null) {
+                IconButton(
+                    onClick = onRefreshClick,
+                    enabled = !isRefreshing,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFF10B981)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Fleet Data",
+                            tint = Color(0xFF0F172A),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(6.dp))
             }
 
             // Notification Bell with Badge

@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +22,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.lorryowner.app.security.SessionManager
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.*
 
 @Composable
@@ -98,6 +101,27 @@ fun FinanceDashboardScreen(
                         )
                     }
                     IconButton(
+                        onClick = { viewModel.loadSummary(state.selectedYear) },
+                        enabled = !state.isLoading,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        if (state.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFF10B981)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh Finance Data",
+                                tint = Color(0xFF0F172A),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(
                         onClick = {
                             onNavigateToMonthDetails(state.selectedYear, state.currentMonthNumber)
                         },
@@ -127,14 +151,20 @@ fun FinanceDashboardScreen(
         },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        LazyColumn(
+        BhpPullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.loadSummary(state.selectedYear) },
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF8FAFC))
-                .padding(innerPadding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(innerPadding)
         ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFF8FAFC)),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             // 1. Year Selector Pill Button
             item {
                 Box(
@@ -397,6 +427,7 @@ fun FinanceDashboardScreen(
             }
         }
     }
+}
 }
 
 @Composable

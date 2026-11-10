@@ -87,7 +87,7 @@ fun LiveSatelliteTrackingScreen(
     }
 
     // 1. Draw / update Road-Following Route to Destination & Terminal Pins
-    LaunchedEffect(data?.plannedRoadRoute, googleMapRef, state.isSatelliteMode) {
+    LaunchedEffect(data?.plannedRoadRoute, data?.latitude, data?.longitude, googleMapRef, state.isSatelliteMode) {
         val map = googleMapRef ?: return@LaunchedEffect
         val route = data?.plannedRoadRoute ?: return@LaunchedEffect
         if (route.isEmpty()) return@LaunchedEffect
@@ -99,16 +99,11 @@ fun LiveSatelliteTrackingScreen(
             android.graphics.Color.parseColor("#2563EB") // Royal Blue on light streets
         }
 
-        // If truck is slightly off the road (e.g. inside a compound), connect smoothly from the truck
+        // Slice remaining route so the BLUE line begins at current lorry position and continues to destination
         val truckLat = data.latitude
         val truckLon = data.longitude
-        val pointsToDraw = if (truckLat != null && truckLon != null && route.isNotEmpty()) {
-            val dist = OsrmRoutingService.haversineDistanceMeters(truckLat, truckLon, route[0].latitude, route[0].longitude)
-            if (dist in 5.0..250.0) {
-                listOf(LatLng(truckLat, truckLon)) + route
-            } else {
-                route
-            }
+        val pointsToDraw = if (truckLat != null && truckLon != null) {
+            OsrmRoutingService.sliceRemainingRoute(LatLng(truckLat, truckLon), route)
         } else {
             route
         }
@@ -204,8 +199,8 @@ fun LiveSatelliteTrackingScreen(
             val poly = map.addPolyline(
                 PolylineOptions()
                     .width(10f)
-                    .color(android.graphics.Color.parseColor("#16A34A")) // Emerald Green
-                    .zIndex(1.5f)
+                    .color(android.graphics.Color.parseColor("#10B981")) // Vibrant Green (BhpRunningGreen)
+                    .zIndex(2.5f)
                     .addAll(seg)
             )
             newPolylines.add(poly)

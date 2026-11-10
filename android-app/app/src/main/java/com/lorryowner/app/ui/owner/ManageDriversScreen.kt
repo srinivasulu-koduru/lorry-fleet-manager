@@ -41,6 +41,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.security.SessionManager
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.BackArrowIcon
 import com.lorryowner.app.ui.components.CheckSquareIcon
 import com.lorryowner.app.ui.components.DistancePinIcon
@@ -102,7 +105,9 @@ fun ManageDriversScreen(
         topBar = {
             ManageDriversTopBar(
                 onBack = onBack,
-                onAddDriverClick = onAddDriverClick
+                onAddDriverClick = onAddDriverClick,
+                onRefreshClick = { viewModel.refreshDrivers() },
+                isRefreshing = state.isLoading
             )
         },
         modifier = modifier.fillMaxSize()
@@ -113,12 +118,17 @@ fun ManageDriversScreen(
                 .background(BhpScreenBg)
                 .padding(innerPadding)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            BhpPullToRefreshBox(
+                isRefreshing = state.isLoading,
+                onRefresh = { viewModel.refreshDrivers() },
+                modifier = Modifier.fillMaxSize()
             ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                 item {
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -338,6 +348,7 @@ fun ManageDriversScreen(
             }
         }
     }
+    }
 
     // Driver Details Modal Dialog
     if (state.selectedDriverForDetails != null) {
@@ -368,7 +379,9 @@ fun ManageDriversScreen(
 @Composable
 fun ManageDriversTopBar(
     onBack: () -> Unit,
-    onAddDriverClick: () -> Unit
+    onAddDriverClick: () -> Unit,
+    onRefreshClick: (() -> Unit)? = null,
+    isRefreshing: Boolean = false
 ) {
     Surface(
         color = Color.White,
@@ -407,6 +420,30 @@ fun ManageDriversTopBar(
                         fontSize = 11.5.sp
                     )
                 )
+            }
+
+            if (onRefreshClick != null) {
+                IconButton(
+                    onClick = onRefreshClick,
+                    enabled = !isRefreshing,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = BhpDriverBlue
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Drivers",
+                            tint = BhpTextPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(6.dp))
             }
 
             // "+ Add New Driver" Button

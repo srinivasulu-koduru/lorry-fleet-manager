@@ -40,7 +40,9 @@ data class DriverTripUiItem(
     val distanceKm: String? = null,
     val deliveryNotes: String? = null,
     val plannedDeliveryTime: String? = null,
-    val loadType: String? = null
+    val loadType: String? = null,
+    val tripAmount: Double = 0.0,
+    val tripAmountFormatted: String? = null
 )
 
 /**

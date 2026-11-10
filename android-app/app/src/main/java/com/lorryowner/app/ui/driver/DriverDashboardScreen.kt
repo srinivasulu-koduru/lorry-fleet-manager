@@ -14,6 +14,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.R
 import com.lorryowner.app.service.DriverTripTrackingService
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.*
 import com.lorryowner.app.ui.theme.*
 import kotlinx.coroutines.delay
@@ -63,6 +66,20 @@ fun DriverDashboardScreen(
     val isTrackingActive by DriverTripTrackingService.isTrackingActive.collectAsState()
     val isMutating = viewModel.isMutatingTrip
 
+    // Refresh driver dashboard data when returning to the app from background (ON_RESUME)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.loadDashboardData(isRefresh = true)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // Permission coordinator for starting trips directly from the dashboard
     DriverTrackingPermissionCoordinator(
         onPermissionsGranted = {
@@ -74,17 +91,24 @@ fun DriverDashboardScreen(
             topBar = {
                 DriverDashboardHeader(
                     onMenuClick = { showDispatchDialog = true },
-                    onNotificationClick = { showDispatchDialog = true }
+                    onNotificationClick = { showDispatchDialog = true },
+                    onRefreshClick = { viewModel.loadDashboardData(isRefresh = true) },
+                    isRefreshing = state.isRefreshing
                 )
             },
             containerColor = Color(0xFFF8FAFC),
             modifier = modifier
         ) { innerPadding ->
 
-            LazyColumn(
+            BhpPullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { viewModel.loadDashboardData(isRefresh = true) },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -146,6 +170,7 @@ fun DriverDashboardScreen(
                 }
             }
         }
+    }
 
         // Start Trip Confirmation Dialog
         if (showStartConfirmDialog && state.todayTrip != null) {
@@ -357,6 +382,8 @@ fun DriverDashboardScreen(
 fun DriverDashboardHeader(
     onMenuClick: () -> Unit,
     onNotificationClick: () -> Unit,
+    onRefreshClick: (() -> Unit)? = null,
+    isRefreshing: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -402,6 +429,31 @@ fun DriverDashboardHeader(
                         fontWeight = FontWeight.Medium
                     )
                 )
+            }
+
+            // Refresh Button
+            if (onRefreshClick != null) {
+                IconButton(
+                    onClick = onRefreshClick,
+                    enabled = !isRefreshing,
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFF10B981)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = Color(0xFF0F172A),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(4.dp))
             }
 
             // Right: Notification Bell Icon with unread badge

@@ -68,6 +68,10 @@ public class OwnerTripService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This lorry is already assigned to an active trip. Please select another lorry.");
         }
 
+        if (lorry.getOperationalStatus() != null && lorry.getOperationalStatus() != OperationalStatus.AVAILABLE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This lorry is currently " + lorry.getOperationalStatus() + " and not available for new trips. Please select another lorry.");
+        }
+
         // 2. Validate and resolve Driver
         if (request.driverId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Driver ID is required");

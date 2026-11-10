@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -21,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.security.SessionManager
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.DashboardTruckIcon
 import com.lorryowner.app.ui.components.DriverCapIcon
 import com.lorryowner.app.ui.components.LocationPinIcon
@@ -74,18 +77,31 @@ fun RunningLorriesScreen(
                         ),
                         modifier = Modifier.weight(1f)
                     )
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        Column(
+        BhpPullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.refresh() },
             modifier = Modifier
                 .fillMaxSize()
-                .background(BhpScreenBg)
                 .padding(innerPadding)
-                .padding(16.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BhpScreenBg)
+                    .padding(16.dp)
+            ) {
             // Header count pill
             Surface(
                 color = if (isRunningFilter) BhpRunningGreenBg else Color(0xFFF1F5F9),
@@ -166,6 +182,7 @@ fun RunningLorriesScreen(
             }
         }
     }
+}
 }
 
 @Composable

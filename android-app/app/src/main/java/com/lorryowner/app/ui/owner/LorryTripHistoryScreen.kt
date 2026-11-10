@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.security.SessionManager
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.ChevronRightIcon
 import com.lorryowner.app.ui.components.ClockTimerIcon
 import com.lorryowner.app.ui.components.DriverCapIcon
@@ -69,6 +72,13 @@ fun LorryTripHistoryScreen(
                         ),
                         modifier = Modifier.weight(1f)
                     )
+                    IconButton(onClick = { viewModel.loadData() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         },
@@ -143,16 +153,22 @@ fun LorryTripHistoryScreen(
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                BhpPullToRefreshBox(
+                    isRefreshing = state.isLoading,
+                    onRefresh = { viewModel.loadData() },
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    items(state.filteredTrips, key = { it.id }) { trip ->
-                        TripCardItem(
-                            trip = trip,
-                            onClick = { viewModel.selectTripForDetails(trip) },
-                            onCancelTripClick = { tripToCancel = trip }
-                        )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(state.filteredTrips, key = { it.id }) { trip ->
+                            TripCardItem(
+                                trip = trip,
+                                onClick = { viewModel.selectTripForDetails(trip) },
+                                onCancelTripClick = { tripToCancel = trip }
+                            )
+                        }
                     }
                 }
             }

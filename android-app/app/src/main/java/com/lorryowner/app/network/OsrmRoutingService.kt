@@ -248,6 +248,46 @@ object OsrmRoutingService {
     }
 
     /**
+     * Slices the planned road route to only include the remaining path from the current
+     * position forward to the destination. Removes all route segments already passed.
+     *
+     * This ensures the BLUE line only shows the remaining route, while the GREEN line
+     * shows the actual travelled breadcrumbs, keeping the two visually distinct.
+     */
+    fun sliceRemainingRoute(
+        currentLocation: LatLng,
+        fullRoute: List<LatLng>
+    ): List<LatLng> {
+        if (fullRoute.size <= 1) return fullRoute
+
+        var minDistance = Double.MAX_VALUE
+        var closestSegmentIndex = 0
+
+        // Find which road segment the vehicle is currently nearest to
+        for (i in 0 until fullRoute.size - 1) {
+            val p1 = fullRoute[i]
+            val p2 = fullRoute[i + 1]
+            val dist = distanceToSegmentMeters(currentLocation, p1, p2)
+            if (dist < minDistance) {
+                minDistance = dist
+                closestSegmentIndex = i
+            }
+        }
+
+        // If vehicle is reasonably near the road route (within 500m), slice from closest segment forward
+        return if (minDistance <= 500.0) {
+            if (closestSegmentIndex + 1 < fullRoute.size) {
+                listOf(currentLocation) + fullRoute.subList(closestSegmentIndex + 1, fullRoute.size)
+            } else {
+                listOf(currentLocation, fullRoute.last())
+            }
+        } else {
+            // Vehicle has deviated; connect vehicle to the full remaining planned route
+            listOf(currentLocation) + fullRoute
+        }
+    }
+
+    /**
      * Clears cache for a given trip (e.g. when route completed).
      */
     fun clearCache(tripId: Long? = null) {

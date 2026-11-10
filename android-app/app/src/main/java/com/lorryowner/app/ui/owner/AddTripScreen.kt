@@ -10,6 +10,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,6 +56,11 @@ fun AddTripScreen(
 
     val calendar = remember { Calendar.getInstance() }
 
+    // Always fetch fresh available lorries & drivers on screen entry to avoid stale cached availability
+    LaunchedEffect(Unit) {
+        viewModel.loadEligibleLorriesAndDrivers()
+    }
+
     Scaffold(
         topBar = {
             Surface(color = BhpNavyDark, modifier = Modifier.fillMaxWidth()) {
@@ -77,8 +84,29 @@ fun AddTripScreen(
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 18.sp
-                        )
+                        ),
+                        modifier = Modifier.weight(1f)
                     )
+                    IconButton(
+                        onClick = { viewModel.loadEligibleLorriesAndDrivers() },
+                        enabled = !state.isLoadingLorriesAndDrivers,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        if (state.isLoadingLorriesAndDrivers) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh available resources",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -320,7 +348,54 @@ fun AddTripScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 5 & 6. Planned Departure Date & Time Required
+            // 5. Trip Amount Required (Prominently placed in primary Trip Information)
+            Text(
+                text = "Trip Amount (₹) *",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = BhpTextPrimary,
+                    fontSize = 13.5.sp
+                )
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedTextField(
+                value = state.tripAmount,
+                onValueChange = { viewModel.onTripAmountChange(it) },
+                placeholder = { Text("e.g. 25000 (Expected freight revenue)", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
+                prefix = {
+                    Text(
+                        text = "₹ ",
+                        fontWeight = FontWeight.Bold,
+                        color = BhpNavyDark,
+                        fontSize = 15.sp
+                    )
+                },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                ),
+                isError = state.tripAmountError != null,
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = BhpCardWhite,
+                    unfocusedContainerColor = BhpCardWhite,
+                    focusedBorderColor = BhpRunningGreen,
+                    unfocusedBorderColor = BhpCardBorder
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (state.tripAmountError != null) {
+                Text(
+                    text = state.tripAmountError,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 6 & 7. Planned Departure Date & Time Required
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -516,54 +591,7 @@ fun AddTripScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Trip Amount Required
-            Text(
-                text = "Trip Amount (₹) *",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = BhpTextPrimary,
-                    fontSize = 13.sp
-                )
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            OutlinedTextField(
-                value = state.tripAmount,
-                onValueChange = { viewModel.onTripAmountChange(it) },
-                placeholder = { Text("e.g. 25000", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
-                prefix = {
-                    Text(
-                        text = "₹ ",
-                        fontWeight = FontWeight.Bold,
-                        color = BhpNavyDark,
-                        fontSize = 14.sp
-                    )
-                },
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                ),
-                isError = state.tripAmountError != null,
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = BhpCardWhite,
-                    unfocusedContainerColor = BhpCardWhite,
-                    focusedBorderColor = BhpRunningGreen,
-                    unfocusedBorderColor = BhpCardBorder
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-            if (state.tripAmountError != null) {
-                Text(
-                    text = state.tripAmountError,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // 9. Load Type Dropdown
+            // 8. Load Type Dropdown
             Text(
                 text = "Load Type *",
                 style = MaterialTheme.typography.bodyMedium.copy(

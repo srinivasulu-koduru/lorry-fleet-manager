@@ -126,16 +126,18 @@ class AddTripViewModel(
                 val fetchedLorries = lorriesResult.getOrDefault(emptyList())
                 val fetchedDrivers = driversResult.getOrDefault(emptyList())
 
-                // Default auto-select first lorry and its assigned driver if present
+                // Ensure selected lorry & driver are actually eligible from the fresh list
                 val initialLorry = fetchedLorries.firstOrNull()
-                val matchedDriver = fetchedDrivers.find { it.id == initialLorry?.assignedDriverId }
+                val validSelectedLorry = fetchedLorries.find { it.id == uiState.selectedLorry?.id } ?: initialLorry
+                val validSelectedDriver = fetchedDrivers.find { it.id == uiState.selectedDriver?.id }
+                    ?: fetchedDrivers.find { it.id == validSelectedLorry?.assignedDriverId }
                     ?: fetchedDrivers.firstOrNull()
 
                 uiState = uiState.copy(
                     lorries = fetchedLorries,
                     drivers = fetchedDrivers,
-                    selectedLorry = uiState.selectedLorry ?: initialLorry,
-                    selectedDriver = uiState.selectedDriver ?: matchedDriver
+                    selectedLorry = validSelectedLorry,
+                    selectedDriver = validSelectedDriver
                 )
             } else {
                 val error = lorriesResult.exceptionOrNull()?.message
@@ -209,7 +211,16 @@ class AddTripViewModel(
     }
 
     fun onTripAmountChange(value: String) {
-        uiState = uiState.copy(tripAmount = value, tripAmountError = null)
+        // Sanitize input: Reject letters and non-numeric characters (allow optional leading minus for validation, at most one decimal point and 2 decimal places)
+        val cleanValue = if (value.startsWith("-")) {
+            "-" + value.substring(1).filter { it.isDigit() || it == '.' }
+        } else {
+            value.filter { it.isDigit() || it == '.' }
+        }
+        if (cleanValue.count { it == '.' } > 1) return
+        val parts = cleanValue.split('.')
+        if (parts.size == 2 && parts[1].length > 2) return
+        uiState = uiState.copy(tripAmount = cleanValue, tripAmountError = null)
     }
 
     fun onRemarksChange(value: String) {

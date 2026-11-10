@@ -160,8 +160,8 @@ fun DriverLiveRouteMapCard(
         }
     }
 
-    // 3. Update Map Polylines (Selected, Alternatives, Breadcrumbs)
-    LaunchedEffect(matchingState.selectedRouteId, candidateRoutes, googleMapRef) {
+    // 3. Update Map Polylines (Selected Remaining Route, Alternatives, Terminal Markers)
+    LaunchedEffect(matchingState.selectedRouteId, candidateRoutes, googleMapRef, latestGpsLocation) {
         val map = googleMapRef ?: return@LaunchedEffect
         val selectedId = matchingState.selectedRouteId ?: candidateRoutes.firstOrNull()?.id
 
@@ -174,22 +174,17 @@ fun DriverLiveRouteMapCard(
 
         for (route in candidateRoutes) {
             if (route.id == selectedId) {
-                // If truck is slightly off road (e.g. inside compound), connect smoothly to first road point
+                // Slice remaining route so the BLUE line begins at the driver's current position and ends at destination
                 val pointsToDraw = if (truckLoc != null && route.points.isNotEmpty()) {
-                    val dist = OsrmRoutingService.haversineDistanceMeters(
-                        truckLoc.latitude, truckLoc.longitude,
-                        route.points[0].latitude, route.points[0].longitude
-                    )
-                    if (dist in 5.0..250.0) {
-                        listOf(LatLng(truckLoc.latitude, truckLoc.longitude)) + route.points
-                    } else {
+                    OsrmRoutingService.sliceRemainingRoute(
+                        LatLng(truckLoc.latitude, truckLoc.longitude),
                         route.points
-                    }
+                    )
                 } else {
                     route.points
                 }
 
-                // Prominent Blue Line for selected route following road to destination
+                // Prominent Royal Blue Line for remaining route following road to destination
                 val poly = map.addPolyline(
                     PolylineOptions()
                         .addAll(pointsToDraw)
@@ -280,8 +275,8 @@ fun DriverLiveRouteMapCard(
                 PolylineOptions()
                     .addAll(seg)
                     .width(10f)
-                    .color(android.graphics.Color.parseColor("#16A34A")) // Vibrant Green
-                    .zIndex(1.5f)
+                    .color(android.graphics.Color.parseColor("#10B981")) // Vibrant Green (BhpRunningGreen)
+                    .zIndex(2.5f)
             )
             newTravelled.add(poly)
         }

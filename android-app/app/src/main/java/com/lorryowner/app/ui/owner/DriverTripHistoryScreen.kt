@@ -12,6 +12,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.security.SessionManager
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.BackArrowIcon
 import com.lorryowner.app.ui.components.DashboardTruckIcon
 import com.lorryowner.app.ui.components.DistancePinIcon
@@ -50,7 +53,9 @@ fun DriverTripHistoryScreen(
             TripHistoryTopBar(
                 driverName = driverName,
                 driverUsername = driverUsername,
-                onBack = onBack
+                onBack = onBack,
+                onRefresh = { viewModel.refresh() },
+                isRefreshing = state.isLoading
             )
         },
         modifier = modifier.fillMaxSize()
@@ -61,12 +66,17 @@ fun DriverTripHistoryScreen(
                 .background(BhpScreenBg)
                 .padding(innerPadding)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            BhpPullToRefreshBox(
+                isRefreshing = state.isLoading,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize()
             ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                 item {
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -241,6 +251,7 @@ fun DriverTripHistoryScreen(
             }
         }
     }
+    }
 
     // Trip Details Dialog
     if (state.selectedTripForDetails != null) {
@@ -312,7 +323,9 @@ fun DriverTripHistoryScreen(
 private fun TripHistoryTopBar(
     driverName: String,
     driverUsername: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    isRefreshing: Boolean
 ) {
     Surface(
         color = Color.White,
@@ -351,6 +364,27 @@ private fun TripHistoryTopBar(
                         fontSize = 12.sp
                     )
                 )
+            }
+
+            IconButton(
+                onClick = onRefresh,
+                enabled = !isRefreshing,
+                modifier = Modifier.size(36.dp)
+            ) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = BhpDriverBlue
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = BhpTextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

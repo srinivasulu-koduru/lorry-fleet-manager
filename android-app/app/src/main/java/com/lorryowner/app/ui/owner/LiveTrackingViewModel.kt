@@ -249,6 +249,9 @@ class LiveTrackingViewModel(
                         driverPhone = if (obj.has("driverPhone") && !obj.isNull("driverPhone")) obj.getString("driverPhone") else null,
                         originLocation = obj.optString("originLocation"),
                         destinationLocation = obj.optString("destinationLocation"),
+                        tripAmount = if (obj.has("tripAmount") && !obj.isNull("tripAmount")) obj.optDouble("tripAmount", 0.0) else 0.0,
+                        tripAmountFormatted = if (obj.has("tripAmount") && !obj.isNull("tripAmount") && obj.optDouble("tripAmount", 0.0) > 0)
+                            "₹" + String.format(java.util.Locale.getDefault(), "%,.0f", obj.optDouble("tripAmount", 0.0)) else null,
                         currentLocationDescription = obj.optString("currentLocationDescription", "Waiting for driver location"),
                         latitude = if (obj.has("latitude") && !obj.isNull("latitude")) obj.getDouble("latitude") else null,
                         longitude = if (obj.has("longitude") && !obj.isNull("longitude")) obj.getDouble("longitude") else null,

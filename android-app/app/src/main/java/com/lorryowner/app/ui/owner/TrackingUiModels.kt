@@ -26,6 +26,8 @@ data class LiveTrackingLorryUiState(
     val driverPhone: String? = null,
     val originLocation: String = "",
     val destinationLocation: String = "",
+    val tripAmount: Double = 0.0,
+    val tripAmountFormatted: String? = null,
     val currentLocationDescription: String = "Waiting for driver location",
     val latitude: Double? = null,
     val longitude: Double? = null,

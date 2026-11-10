@@ -311,9 +311,13 @@ class DriverDashboardViewModel(
         }
     }
 
-    fun refreshAll() {
+    fun refreshAll(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            dashboardState = dashboardState.copy(isLoading = true, errorMessage = null)
+            dashboardState = dashboardState.copy(
+                isLoading = !isRefresh,
+                isRefreshing = isRefresh,
+                errorMessage = null
+            )
             withContext(Dispatchers.IO) {
                 fetchDashboard()
                 fetchTrips()
@@ -322,6 +326,8 @@ class DriverDashboardViewModel(
             dashboardState = dashboardState.copy(isLoading = false, isRefreshing = false)
         }
     }
+
+    fun loadDashboardData(isRefresh: Boolean = false) = refreshAll(isRefresh)
 
     fun fetchDashboard(): Result<Unit> {
         val token = sessionManager?.getAccessToken()
@@ -481,7 +487,10 @@ class DriverDashboardViewModel(
             distanceKm = obj.optString("distanceKm").takeIf { it.isNotBlank() },
             deliveryNotes = obj.optString("deliveryNotes").takeIf { it.isNotBlank() },
             plannedDeliveryTime = obj.optString("plannedDeliveryTime").takeIf { it.isNotBlank() },
-            loadType = obj.optString("loadType").takeIf { it.isNotBlank() }
+            loadType = obj.optString("loadType").takeIf { it.isNotBlank() },
+            tripAmount = if (obj.has("tripAmount") && !obj.isNull("tripAmount")) obj.optDouble("tripAmount", 0.0) else 0.0,
+            tripAmountFormatted = if (obj.has("tripAmount") && !obj.isNull("tripAmount") && obj.optDouble("tripAmount", 0.0) > 0)
+                "₹" + String.format(java.util.Locale.getDefault(), "%,.0f", obj.optDouble("tripAmount", 0.0)) else null
         )
     }
 

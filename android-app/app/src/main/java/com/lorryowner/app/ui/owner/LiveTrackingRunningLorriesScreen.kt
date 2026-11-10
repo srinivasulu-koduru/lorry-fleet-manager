@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.security.SessionManager
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.components.DashboardTruckIcon
 import com.lorryowner.app.ui.components.DriverCapIcon
 import com.lorryowner.app.ui.components.LocationPinIcon
@@ -101,13 +102,19 @@ fun LiveTrackingRunningLorriesScreen(
         },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        Column(
+        BhpPullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.loadRunningLorries() },
             modifier = Modifier
                 .fillMaxSize()
-                .background(BhpScreenBg)
                 .padding(innerPadding)
-                .padding(16.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BhpScreenBg)
+                    .padding(16.dp)
+            ) {
             // Count pill
             Surface(
                 color = BhpRunningGreenBg,
@@ -184,6 +191,7 @@ fun LiveTrackingRunningLorriesScreen(
             }
         }
     }
+}
 }
 
 @Composable

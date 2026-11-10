@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lorryowner.app.ui.components.*
+import com.lorryowner.app.ui.components.BhpPullToRefreshBox
 import com.lorryowner.app.ui.theme.*
 
 @Composable
@@ -39,7 +42,28 @@ fun DriverTripsScreen(
         // 1. Top App Bar
         DriverTripsTopBar(
             title = "My Trips",
-            onBack = onBack
+            onBack = onBack,
+            actions = {
+                IconButton(
+                    onClick = { viewModel.loadDashboardData(isRefresh = true) },
+                    enabled = !viewModel.dashboardState.isRefreshing
+                ) {
+                    if (viewModel.dashboardState.isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFF10B981)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Trips",
+                            tint = Color(0xFF0F172A),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
         )
 
         // 2. 4 Organized Tabs: Active, Upcoming, Completed, Cancelled
@@ -48,20 +72,26 @@ fun DriverTripsScreen(
             onTabSelected = { viewModel.selectTripsTab(it) }
         )
 
-        // 3. Trips List or Empty State
-        if (trips.isEmpty()) {
-            DriverTripsEmptyState(tab = selectedTab)
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(trips, key = { it.id }) { trip ->
-                    DriverTripCard(
-                        trip = trip,
-                        onClick = { onTripClick(trip) }
-                    )
+        // 3. Trips List with Pull-to-refresh
+        BhpPullToRefreshBox(
+            isRefreshing = viewModel.dashboardState.isRefreshing,
+            onRefresh = { viewModel.loadDashboardData(isRefresh = true) },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (trips.isEmpty()) {
+                DriverTripsEmptyState(tab = selectedTab)
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(trips, key = { it.id }) { trip ->
+                        DriverTripCard(
+                            trip = trip,
+                            onClick = { onTripClick(trip) }
+                        )
+                    }
                 }
             }
         }

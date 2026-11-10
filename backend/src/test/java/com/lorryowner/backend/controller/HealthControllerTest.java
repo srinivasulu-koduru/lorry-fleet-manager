@@ -30,4 +30,14 @@ class HealthControllerTest {
                 .andExpect(jsonPath("$.status").value("UP"))
                 .andExpect(jsonPath("$.application").value("Lorry Owner Backend"));
     }
+
+    @Test
+    @DisplayName("GET / returns 200 OK for platform health probes")
+    void rootEndpoint_shouldReturnStatusUp() throws Exception {
+        mockMvc.perform(get("/")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
 }

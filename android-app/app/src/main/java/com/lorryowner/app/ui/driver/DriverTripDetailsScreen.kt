@@ -8,6 +8,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -88,7 +90,20 @@ fun DriverTripDetailsScreen(
             topBar = {
                 DriverTopAppBar(
                     title = "Trip Details",
-                    onBack = onBack
+                    onBack = onBack,
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                viewModel?.loadDashboardData(isRefresh = true)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh trip details",
+                                tint = Color(0xFF0F172A)
+                            )
+                        }
+                    }
                 )
             },
             bottomBar = {
@@ -555,6 +570,31 @@ fun DriverTripDetailsScreen(
                                         color = Color(0xFF0F172A)
                                     )
                                 }
+                            }
+                        }
+
+                        if (!trip.tripAmountFormatted.isNullOrBlank()) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 12.dp),
+                                color = Color(0xFFF1F5F9)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Trip Freight Amount",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF64748B),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = trip.tripAmountFormatted,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF15803D)
+                                )
                             }
                         }
                     }
