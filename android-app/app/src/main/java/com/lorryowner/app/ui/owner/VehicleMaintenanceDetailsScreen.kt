@@ -38,6 +38,7 @@ fun VehicleMaintenanceDetailsScreen(
     sessionManager: SessionManager? = null,
     onBack: () -> Unit = {},
     onAddServiceRecordClick: (Long) -> Unit = {},
+    onNavigateToTripDetails: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val viewModel = remember(lorryId) {
@@ -304,7 +305,8 @@ fun VehicleMaintenanceDetailsScreen(
                 items(state.records, key = { it.id }) { record ->
                     MaintenanceHistoryRecordCard(
                         record = record,
-                        onClick = { selectedRecordForDialog = record }
+                        onClick = { selectedRecordForDialog = record },
+                        onTripClick = { tripId -> onNavigateToTripDetails(tripId) }
                     )
                 }
             }
@@ -352,6 +354,28 @@ fun VehicleMaintenanceDetailsScreen(
                             fontSize = 13.sp
                         )
                     }
+                    if (!record.tripReference.isNullOrBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (record.tripId != null) {
+                                        selectedRecordForDialog = null
+                                        onNavigateToTripDetails(record.tripId)
+                                    }
+                                }
+                        ) {
+                            Text(text = "Related Trip:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = "${record.tripReference} ➔",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BhpMaroonPrimary
+                            )
+                        }
+                    }
                     if (record.description.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(text = "Description:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
@@ -376,6 +400,7 @@ fun VehicleMaintenanceDetailsScreen(
 private fun MaintenanceHistoryRecordCard(
     record: MaintenanceHistoryRecordItem,
     onClick: () -> Unit,
+    onTripClick: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -426,7 +451,7 @@ private fun MaintenanceHistoryRecordCard(
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            // Middle Column: Service Type & Workshop
+            // Middle Column: Service Type, Workshop & Related Trip Chip
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = record.serviceType,
@@ -452,6 +477,27 @@ private fun MaintenanceHistoryRecordCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                if (!record.tripReference.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Surface(
+                        color = Color(0xFFEFF6FF),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.clickable {
+                            if (record.tripId != null) {
+                                onTripClick?.invoke(record.tripId)
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = "Trip: ${record.tripReference} ➔",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = BhpMaroonPrimary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(10.dp))

@@ -2,6 +2,7 @@ package com.lorryowner.backend.repository;
 
 import com.lorryowner.backend.entity.Lorry;
 import com.lorryowner.backend.entity.MaintenanceRecord;
+import com.lorryowner.backend.entity.Trip;
 import com.lorryowner.backend.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,13 @@ public interface MaintenanceRecordRepository extends JpaRepository<MaintenanceRe
     Page<MaintenanceRecord> findByLorryOrderByMaintenanceDateDesc(Lorry lorry, Pageable pageable);
 
     List<MaintenanceRecord> findByLorryAndOwnerOrderByMaintenanceDateDesc(Lorry lorry, User owner);
+
+    List<MaintenanceRecord> findByTripOrderByMaintenanceDateDesc(Trip trip);
+
+    List<MaintenanceRecord> findByTripAndOwnerOrderByMaintenanceDateDesc(Trip trip, User owner);
+
+    @Query("SELECT COALESCE(SUM(m.cost), 0) FROM MaintenanceRecord m WHERE m.trip = :trip")
+    BigDecimal sumCostByTrip(@Param("trip") Trip trip);
 
     List<MaintenanceRecord> findByOwnerOrderByMaintenanceDateDesc(User owner);
 

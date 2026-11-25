@@ -11,7 +11,8 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "maintenance_records", indexes = {
         @Index(name = "idx_maintenance_owner_date", columnList = "owner_id, maintenance_date"),
-        @Index(name = "idx_maintenance_lorry_date", columnList = "lorry_id, maintenance_date")
+        @Index(name = "idx_maintenance_lorry_date", columnList = "lorry_id, maintenance_date"),
+        @Index(name = "idx_maintenance_trip", columnList = "trip_id")
 })
 public class MaintenanceRecord {
 
@@ -26,6 +27,10 @@ public class MaintenanceRecord {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trip_id")
+    private Trip trip;
 
     @Column(name = "maintenance_date", nullable = false)
     private LocalDate maintenanceDate;
@@ -69,6 +74,21 @@ public class MaintenanceRecord {
             Integer odometerReadingKm,
             LocalDate nextServiceDate
     ) {
+        this(lorry, owner, maintenanceDate, serviceType, description, cost, serviceCenter, odometerReadingKm, nextServiceDate, null);
+    }
+
+    public MaintenanceRecord(
+            Lorry lorry,
+            User owner,
+            LocalDate maintenanceDate,
+            String serviceType,
+            String description,
+            BigDecimal cost,
+            String serviceCenter,
+            Integer odometerReadingKm,
+            LocalDate nextServiceDate,
+            Trip trip
+    ) {
         this.lorry = lorry;
         this.owner = owner;
         this.maintenanceDate = maintenanceDate;
@@ -78,6 +98,7 @@ public class MaintenanceRecord {
         this.serviceCenter = serviceCenter;
         this.odometerReadingKm = odometerReadingKm;
         this.nextServiceDate = nextServiceDate;
+        this.trip = trip;
     }
 
     public Long getId() {
@@ -158,6 +179,14 @@ public class MaintenanceRecord {
 
     public void setNextServiceDate(LocalDate nextServiceDate) {
         this.nextServiceDate = nextServiceDate;
+    }
+
+    public Trip getTrip() {
+        return trip;
+    }
+
+    public void setTrip(Trip trip) {
+        this.trip = trip;
     }
 
     public Instant getCreatedAt() {

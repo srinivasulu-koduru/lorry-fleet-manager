@@ -133,7 +133,9 @@ class VehicleMaintenanceDetailsViewModel(
                         odometerReadingKm = if (r.has("odometerReadingKm") && !r.isNull("odometerReadingKm")) r.optInt("odometerReadingKm") else null,
                         nextServiceDate = r.optString("nextServiceDate").takeIf { it.isNotBlank() && it != "null" },
                         serviceCenter = r.optString("serviceCenter").takeIf { it.isNotBlank() && it != "null" },
-                        status = "Completed"
+                        status = "Completed",
+                        tripId = if (r.has("tripId") && !r.isNull("tripId")) r.optLong("tripId") else null,
+                        tripReference = r.optString("tripReference").takeIf { it.isNotBlank() && it != "null" }
                     )
                 )
             }

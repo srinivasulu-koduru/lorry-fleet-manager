@@ -64,6 +64,25 @@ public interface TripRepository extends JpaRepository<Trip, Long>, JpaSpecificat
 
     long countByOwner(User owner);
 
+    @Query("SELECT t FROM Trip t LEFT JOIN t.driver d LEFT JOIN t.lorry l WHERE t.owner = :owner " +
+            "AND (:status IS NULL OR t.tripStatus = :status) " +
+            "AND (:startDate IS NULL OR t.tripDate >= :startDate) " +
+            "AND (:endDate IS NULL OR t.tripDate <= :endDate) " +
+            "AND (:search IS NULL OR LOWER(t.tripReference) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "    OR LOWER(t.originLocation) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "    OR LOWER(t.destinationLocation) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "    OR LOWER(l.registrationNumber) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "    OR (d IS NOT NULL AND LOWER(d.fullName) LIKE LOWER(CONCAT('%', :search, '%')))) " +
+            "ORDER BY t.tripDate DESC, t.id DESC")
+    Page<Trip> findFilteredTripsByOwner(
+            @Param("owner") User owner,
+            @Param("status") TripStatus status,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("search") String search,
+            Pageable pageable
+    );
+
     @Query("SELECT t FROM Trip t LEFT JOIN t.driver d WHERE t.lorry = :lorry " +
             "AND (:status IS NULL OR t.tripStatus = :status) " +
             "AND (:startDate IS NULL OR t.tripDate >= :startDate) " +

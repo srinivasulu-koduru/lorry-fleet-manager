@@ -22,6 +22,16 @@ public interface FinanceTransactionRepository extends JpaRepository<FinanceTrans
 
     Optional<FinanceTransaction> findByTripAndTransactionType(Trip trip, String transactionType);
 
+    List<FinanceTransaction> findByTripOrderByTransactionDateDesc(Trip trip);
+
+    List<FinanceTransaction> findByTripAndTransactionTypeOrderByTransactionDateDesc(Trip trip, String transactionType);
+
+    @Query("SELECT COALESCE(SUM(ft.amount), 0) FROM FinanceTransaction ft WHERE ft.trip = :trip AND ft.transactionType = 'EXPENSE'")
+    BigDecimal sumExpensesByTrip(@Param("trip") Trip trip);
+
+    @Query("SELECT ft.category, COALESCE(SUM(ft.amount), 0) FROM FinanceTransaction ft WHERE ft.trip = :trip AND ft.transactionType = 'EXPENSE' GROUP BY ft.category")
+    List<Object[]> sumExpensesByTripGroupedByCategory(@Param("trip") Trip trip);
+
     @Query("SELECT COALESCE(SUM(ft.amount), 0) FROM FinanceTransaction ft " +
             "WHERE ft.owner = :owner AND ft.transactionType = 'INCOME' AND ft.paymentStatus = 'RECEIVED'")
     BigDecimal sumIncomeByOwner(@Param("owner") User owner);

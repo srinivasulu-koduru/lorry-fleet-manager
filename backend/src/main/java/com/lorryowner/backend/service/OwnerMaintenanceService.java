@@ -344,7 +344,9 @@ public class OwnerMaintenanceService {
                 r.getCost(),
                 r.getServiceCenter(),
                 r.getOdometerReadingKm(),
-                r.getNextServiceDate()
+                r.getNextServiceDate(),
+                r.getTrip() != null ? r.getTrip().getId() : null,
+                r.getTrip() != null ? r.getTrip().getTripReference() : null
         );
     }
 }

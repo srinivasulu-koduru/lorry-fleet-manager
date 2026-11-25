@@ -40,7 +40,9 @@ data class MaintenanceHistoryRecordItem(
     val odometerReadingKm: Int?,
     val nextServiceDate: String?,
     val serviceCenter: String?,
-    val status: String = "Completed"
+    val status: String = "Completed",
+    val tripId: Long? = null,
+    val tripReference: String? = null
 )
 
 data class VehicleMaintenanceDetailsUiState(

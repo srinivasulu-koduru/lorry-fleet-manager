@@ -41,6 +41,7 @@ testing-reports/
 # OS files
 .DS_Store
 Thumbs.db
+bhp-original-logo.png
 
 # Bootstrap safeguards
 .*safeguard*

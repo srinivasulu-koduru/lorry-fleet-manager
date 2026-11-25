@@ -1,5 +1,11 @@
 package com.lorryowner.app.ui.owner
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -16,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -51,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,6 +77,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -147,7 +156,9 @@ enum class OwnerDestination {
     LIVE_TRACKING_LIST,
     LIVE_SATELLITE_MAP,
     FINANCE_DASHBOARD,
-    MONTHLY_FINANCE_DETAILS
+    MONTHLY_FINANCE_DETAILS,
+    TRIP_HISTORY,
+    TRIP_DETAILS
 }
 
 @Composable
@@ -169,6 +180,8 @@ fun OwnerDashboardScreen(
     var selectedTrackingTripId by remember { mutableStateOf<Long?>(null) }
     var selectedFinanceYear by remember { mutableStateOf(java.time.LocalDate.now().year) }
     var selectedFinanceMonth by remember { mutableStateOf(java.time.LocalDate.now().monthValue) }
+    var selectedTripIdForDetails by remember { mutableStateOf<Long?>(null) }
+    var previousDestinationBeforeTripDetails by remember { mutableStateOf(OwnerDestination.TRIP_HISTORY) }
     var createdTripResult by remember { mutableStateOf<CreatedTripUiState?>(null) }
     val addTripViewModel = remember(effectiveSession) { AddTripViewModel(effectiveSession) }
 
@@ -243,6 +256,8 @@ fun OwnerDashboardScreen(
             OwnerDestination.LIVE_TRACKING_LIST -> currentDestination = OwnerDestination.DASHBOARD
             OwnerDestination.MONTHLY_FINANCE_DETAILS -> currentDestination = OwnerDestination.FINANCE_DASHBOARD
             OwnerDestination.FINANCE_DASHBOARD -> currentDestination = OwnerDestination.DASHBOARD
+            OwnerDestination.TRIP_DETAILS -> currentDestination = previousDestinationBeforeTripDetails
+            OwnerDestination.TRIP_HISTORY -> currentDestination = OwnerDestination.DASHBOARD
             OwnerDestination.DASHBOARD -> { }
         }
     }
@@ -456,6 +471,11 @@ fun OwnerDashboardScreen(
                     selectedLorryIdForMaintenance = id
                     currentDestination = OwnerDestination.ADD_MAINTENANCE
                 },
+                onNavigateToTripDetails = { tripId ->
+                    selectedTripIdForDetails = tripId
+                    previousDestinationBeforeTripDetails = OwnerDestination.VEHICLE_MAINTENANCE_DETAILS
+                    currentDestination = OwnerDestination.TRIP_DETAILS
+                },
                 modifier = modifier
             )
         }
@@ -533,6 +553,27 @@ fun OwnerDashboardScreen(
                 modifier = modifier
             )
         }
+        OwnerDestination.TRIP_HISTORY -> {
+            OwnerTripHistoryScreen(
+                sessionManager = effectiveSession,
+                onBack = { currentDestination = OwnerDestination.DASHBOARD },
+                onNavigateToTripDetails = { tripId ->
+                    selectedTripIdForDetails = tripId
+                    previousDestinationBeforeTripDetails = OwnerDestination.TRIP_HISTORY
+                    currentDestination = OwnerDestination.TRIP_DETAILS
+                },
+                modifier = modifier
+            )
+        }
+        OwnerDestination.TRIP_DETAILS -> {
+            val tripId = selectedTripIdForDetails ?: 1L
+            OwnerTripDetailsScreen(
+                tripId = tripId,
+                sessionManager = effectiveSession,
+                onBack = { currentDestination = previousDestinationBeforeTripDetails },
+                modifier = modifier
+            )
+        }
         OwnerDestination.DASHBOARD -> {
             DashboardMainScaffold(
                 state = state,
@@ -540,6 +581,7 @@ fun OwnerDashboardScreen(
                 effectiveSession = effectiveSession,
                 onLogout = { onLogout(null) },
                 onNavigateToAddTrip = { currentDestination = OwnerDestination.ADD_TRIP },
+                onNavigateToTripHistory = { currentDestination = OwnerDestination.TRIP_HISTORY },
                 onNavigateToDrivers = { currentDestination = OwnerDestination.MANAGE_DRIVERS },
                 onNavigateToChangePassword = { currentDestination = OwnerDestination.CHANGE_PASSWORD },
                 onNavigateToMyLorries = { currentDestination = OwnerDestination.MY_LORRIES },
@@ -562,6 +604,7 @@ private fun DashboardMainScaffold(
     effectiveSession: SessionManager,
     onLogout: () -> Unit,
     onNavigateToAddTrip: () -> Unit,
+    onNavigateToTripHistory: () -> Unit = {},
     onNavigateToDrivers: () -> Unit,
     onNavigateToChangePassword: () -> Unit,
     onNavigateToMyLorries: () -> Unit,
@@ -583,7 +626,7 @@ private fun DashboardMainScaffold(
                     when (index) {
                         0 -> { /* Home */ }
                         1 -> onNavigateToLiveTracking()
-                        2 -> onNavigateToMaintenance()
+                        2 -> onNavigateToTripHistory()
                         3 -> onNavigateToFinance()
                         4 -> viewModel.showProfileDialog()
                     }
@@ -619,8 +662,13 @@ private fun DashboardMainScaffold(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    // A. Hero Welcome Banner (Your Fleet, Your Control • Smooth Auto-Carousel)
-                    OwnerRotatingWelcomeBanner()
+                    // A. Compact Running Lorry Status & Live Fleet Banner
+                    OwnerLorryStatusCard(
+                        fleetOverview = state.fleetOverview,
+                        recentActivities = state.recentActivities,
+                        lorries = state.lorriesList,
+                        onCardClick = onNavigateToRunningLorries
+                    )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -637,7 +685,7 @@ private fun DashboardMainScaffold(
                     // C. Financial Summary Cards (2x2 Grid: Total Trips, Total Income, Total Expenses, Net Profit)
                     DashboardFinancialCardsGrid(
                         financialSummary = state.financialSummary,
-                        onTripsClick = onNavigateToAddTrip,
+                        onTripsClick = onNavigateToTripHistory,
                         onIncomeClick = onNavigateToFinance,
                         onExpensesClick = onNavigateToMaintenance,
                         onProfitClick = onNavigateToFinance
@@ -843,6 +891,267 @@ fun OwnerDashboardTopBar(
                     hasBadge = unreadNotifications > 0,
                     modifier = Modifier.size(22.dp)
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Compact Running Lorry Status & Live Fleet Card (Top Dashboard Banner)
+ * Shows active running lorry, glowing RUNNING status indicator (or STOPPED indicator),
+ * driver/route details, and fleet quick summary.
+ */
+@Composable
+fun OwnerLorryStatusCard(
+    fleetOverview: FleetOverviewState,
+    recentActivities: List<ActivityItemState>,
+    lorries: List<LorryItemState>,
+    onCardClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val runningLorries = remember(lorries) {
+        lorries.filter {
+            it.operationalStatus.equals("RUNNING", ignoreCase = true) ||
+            it.operationalStatus.equals("ON_TRIP", ignoreCase = true)
+        }
+    }
+
+    var currentRunningIndex by remember { mutableIntStateOf(0) }
+
+    // Auto-cycle through running lorries if there's more than one
+    LaunchedEffect(runningLorries.size) {
+        if (runningLorries.size > 1) {
+            while (isActive) {
+                delay(4000L)
+                currentRunningIndex = (currentRunningIndex + 1) % runningLorries.size
+            }
+        }
+    }
+
+    val activeLorry = if (runningLorries.isNotEmpty()) {
+        runningLorries[currentRunningIndex % runningLorries.size]
+    } else {
+        lorries.firstOrNull()
+    }
+
+    val isRunning = activeLorry != null && (
+        activeLorry.operationalStatus.equals("RUNNING", ignoreCase = true) ||
+        activeLorry.operationalStatus.equals("ON_TRIP", ignoreCase = true) ||
+        fleetOverview.runningNow > 0
+    )
+
+    // Pulsing animation for the active RUNNING glow
+    val infiniteTransition = rememberInfiniteTransition(label = "pulseGlow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+
+    val relatedActivity = remember(activeLorry, recentActivities) {
+        if (activeLorry != null) {
+            recentActivities.firstOrNull { it.registrationNumber.equals(activeLorry.registrationNumber, ignoreCase = true) }
+        } else {
+            recentActivities.firstOrNull()
+        }
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(
+            1.dp,
+            if (isRunning) BhpRunningGreen.copy(alpha = 0.45f) else Color(0xFFE2E8F0)
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onCardClick)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Watermark truck icon in background
+            Image(
+                painter = painterResource(id = R.drawable.bhp_truck_watermark),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                alpha = 0.05f,
+                modifier = Modifier
+                    .size(110.dp)
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 10.dp, y = 10.dp)
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp)
+            ) {
+                // Top row: Lorry Registration & Status Badge + Fleet Count Chip
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isRunning) BhpRunningGreenBg else BhpReadyBlueBg,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                DashboardTruckIcon(
+                                    tint = if (isRunning) BhpRunningGreen else BhpReadyBlue,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Column {
+                            Text(
+                                text = activeLorry?.registrationNumber ?: "Fleet Vehicle",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = BhpTextPrimary
+                                )
+                            )
+                            Text(
+                                text = activeLorry?.makeModel?.ifBlank { "Commercial Heavy Vehicle" } ?: "Fleet Monitoring",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 11.sp,
+                                    color = BhpTextSecondary
+                                )
+                            )
+                        }
+                    }
+
+                    // Fleet quick count badge
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = BhpMaroonPrimary.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, BhpMaroonPrimary.copy(alpha = 0.2f))
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "${fleetOverview.runningNow}/${fleetOverview.totalLorries}",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = BhpMaroonPrimary,
+                                    fontSize = 11.sp
+                                )
+                            )
+                            Text(
+                                text = "Running",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = BhpMaroonPrimary,
+                                    fontSize = 10.sp
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Status Indicator: Glowing RUNNING vs STOPPED
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Glowing dot
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isRunning) {
+                                        BhpRunningGreen.copy(alpha = glowAlpha)
+                                    } else {
+                                        Color(0xFF94A3B8)
+                                    }
+                                )
+                        )
+
+                        Text(
+                            text = if (isRunning) "ACTIVE ON ROAD (RUNNING)" else "IDLE / STOPPED (READY)",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = if (isRunning) BhpRunningGreenText else BhpTextSecondary,
+                                letterSpacing = 0.4.sp
+                            )
+                        )
+                    }
+
+                    if (runningLorries.size > 1) {
+                        Text(
+                            text = "${currentRunningIndex + 1} of ${runningLorries.size}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                color = BhpTextSecondary
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Route / Activity details
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, Color(0xFFEDF2F7)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val detailText = if (relatedActivity != null && relatedActivity.statusDescription.isNotBlank()) {
+                            relatedActivity.statusDescription
+                        } else if (isRunning) {
+                            "Assigned trip in progress • Live GPS connected"
+                        } else {
+                            "Ready for next trip assignment"
+                        }
+
+                        Text(
+                            text = detailText,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 11.sp,
+                                color = Color(0xFF334155),
+                                fontWeight = FontWeight.Medium
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        ChevronRightIcon(
+                            tint = BhpMaroonPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -2650,11 +2959,11 @@ fun OwnerBottomNavBar(
             // Divider
             Box(modifier = Modifier.height(20.dp).width(1.dp).background(Color.White.copy(alpha = 0.2f)))
 
-            // 3. Maintenance
+            // 3. Trips
             BottomNavItem(
-                label = "Maintenance",
+                label = "Trips",
                 isSelected = selectedIndex == 2,
-                icon = { WrenchToolIcon(tint = if (selectedIndex == 2) BhpMaroonPrimary else Color.White, modifier = Modifier.size(20.dp)) },
+                icon = { FormatListIcon(tint = if (selectedIndex == 2) BhpMaroonPrimary else Color.White, modifier = Modifier.size(20.dp)) },
                 onClick = { onSelectIndex(2) },
                 modifier = Modifier.weight(1f)
             )

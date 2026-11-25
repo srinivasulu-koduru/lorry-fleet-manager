@@ -39,14 +39,57 @@ android {
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
+    signingConfigs {
+        create("release") {
+            var storeFilePath = providers.gradleProperty("BHP_RELEASE_STORE_FILE").orNull
+            var storePass = providers.gradleProperty("BHP_RELEASE_STORE_PASSWORD").orNull
+            var keyAl = providers.gradleProperty("BHP_RELEASE_KEY_ALIAS").orNull ?: "bhp-release"
+            var keyPass = providers.gradleProperty("BHP_RELEASE_KEY_PASSWORD").orNull
+
+            // Fallback: Read directly from credentials file outside Git if Gradle properties are not set
+            if (storeFilePath.isNullOrBlank() || storePass.isNullOrBlank() || keyPass.isNullOrBlank()) {
+                val userHome = System.getProperty("user.home")
+                val credFile = File(userHome, ".android/keystores/bhp-release-credentials.txt")
+                if (credFile.exists()) {
+                    credFile.forEachLine { line ->
+                        when {
+                            line.startsWith("Keystore Password:") -> storePass = line.substringAfter(":").trim()
+                            line.startsWith("Key Password:") -> keyPass = line.substringAfter(":").trim()
+                            line.startsWith("Keystore Path:") -> {
+                                val pathFromCred = line.substringAfter(":").trim()
+                                if (pathFromCred.isNotBlank()) storeFilePath = pathFromCred
+                            }
+                            line.startsWith("Key Alias:") -> {
+                                val aliasFromCred = line.substringAfter(":").trim()
+                                if (aliasFromCred.isNotBlank()) keyAl = aliasFromCred
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (storeFilePath.isNullOrBlank()) {
+                val defaultKeystore = File(System.getProperty("user.home"), ".android/keystores/bhp-release.jks")
+                if (defaultKeystore.exists()) {
+                    storeFilePath = defaultKeystore.absolutePath
+                }
+            }
+
+            if (!storeFilePath.isNullOrBlank()) {
+                storeFile = File(storeFilePath)
+                storePassword = storePass
+                keyAlias = keyAl
+                keyPassword = keyPass
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "BACKEND_BASE_URL", "\"https://bhp-logistics-backend.getvoroa.com/\"")
             buildConfigField("boolean", "IS_PRODUCTION", "true")
-            optimization {
-                enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
-            }
+            isMinifyEnabled = false
         }
         debug {
             buildConfigField("String", "BACKEND_BASE_URL", "\"https://bhp-logistics-backend.getvoroa.com/\"")

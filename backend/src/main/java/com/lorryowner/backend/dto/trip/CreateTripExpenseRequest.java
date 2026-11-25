@@ -1,0 +1,28 @@
+package com.lorryowner.backend.dto.trip;
+
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+public record CreateTripExpenseRequest(
+        @NotBlank(message = "Category is required")
+        String category,
+
+        @NotBlank(message = "Description is required")
+        String description,
+
+        @NotNull(message = "Amount is required")
+        @DecimalMin(value = "0.01", message = "Amount must be strictly greater than zero")
+        BigDecimal amount,
+
+        LocalDate expenseDate,
+
+        String notes,
+
+        String serviceCenter,
+
+        Integer odometerReadingKm
+) {}
