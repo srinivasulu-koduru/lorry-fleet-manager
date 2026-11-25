@@ -228,6 +228,15 @@ class OwnerTripHistoryViewModel(
                     }
 
                     return Result.success(Pair(items, totalElements))
+                } else if (responseCode == HttpURLConnection.HTTP_BAD_METHOD) {
+                    // Fallback: Legacy server does not yet have GET /api/owner/trips deployed
+                    Log.i(TAG, "Server returned HTTP 405 on /api/owner/trips. Falling back to lorry trip aggregation...")
+                    val fallback = fetchTripsFallbackLegacy(baseUrl, token)
+                    if (fallback.isSuccess) {
+                        return fallback
+                    }
+                    val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    lastException = Exception("HTTP $responseCode: $err")
                 } else {
                     val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
                     lastException = Exception("HTTP $responseCode: $err")
@@ -241,5 +250,90 @@ class OwnerTripHistoryViewModel(
         }
 
         return Result.failure(lastException ?: Exception("Network request failed"))
+    }
+
+    private fun fetchTripsFallbackLegacy(
+        baseUrl: String,
+        token: String
+    ): Result<Pair<List<OwnerTripItemUiState>, Long>> {
+        return try {
+            val lorriesUrl = URL("$baseUrl/api/owner/lorries")
+            val lorriesConn = (lorriesUrl.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer $token")
+            }
+
+            if (lorriesConn.responseCode != HttpURLConnection.HTTP_OK) {
+                return Result.failure(Exception("HTTP ${lorriesConn.responseCode}: Failed to fetch fleet lorries"))
+            }
+
+            val lorriesRaw = lorriesConn.inputStream.bufferedReader().use(BufferedReader::readText)
+            val lorriesArray = org.json.JSONArray(lorriesRaw)
+            val allTrips = mutableListOf<OwnerTripItemUiState>()
+
+            for (i in 0 until lorriesArray.length()) {
+                val lorryObj = lorriesArray.getJSONObject(i)
+                val lorryId = lorryObj.optLong("id")
+                val regNumber = lorryObj.optString("registrationNumber", "Fleet Lorry")
+                val makeModel = lorryObj.optString("makeModel", "")
+
+                try {
+                    val tripsUrl = URL("$baseUrl/api/owner/lorries/$lorryId/trips?size=50")
+                    val tripsConn = (tripsUrl.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+                        requestMethod = "GET"
+                        connectTimeout = CONNECT_TIMEOUT_MS
+                        readTimeout = READ_TIMEOUT_MS
+                        setRequestProperty("Accept", "application/json")
+                        setRequestProperty("Authorization", "Bearer $token")
+                    }
+
+                    if (tripsConn.responseCode == HttpURLConnection.HTTP_OK) {
+                        val rawTrips = tripsConn.inputStream.bufferedReader().use(BufferedReader::readText)
+                        val tripsJson = JSONObject(rawTrips)
+                        val tripsArr = tripsJson.optJSONArray("trips") ?: org.json.JSONArray()
+
+                        for (j in 0 until tripsArr.length()) {
+                            val t = tripsArr.getJSONObject(j)
+                            allTrips.add(
+                                OwnerTripItemUiState(
+                                    id = t.optLong("id"),
+                                    tripReference = t.optString("tripReference", "TRIP-${t.optLong("id")}"),
+                                    driverId = if (t.has("driverId") && !t.isNull("driverId")) t.optLong("driverId") else null,
+                                    driverName = t.optString("driverName", "Unassigned Driver"),
+                                    lorryId = if (t.has("lorryId") && !t.isNull("lorryId")) t.optLong("lorryId") else lorryId,
+                                    lorryRegistration = t.optString("lorryRegistration", regNumber),
+                                    lorryMakeModel = if (makeModel.isNotBlank()) makeModel else null,
+                                    originLocation = t.optString("originLocation", "Unknown"),
+                                    destinationLocation = t.optString("destinationLocation", "Unknown"),
+                                    tripStatus = t.optString("tripStatus", "COMPLETED"),
+                                    tripDate = t.optString("tripDate", ""),
+                                    startTime = if (t.has("startTime") && !t.isNull("startTime")) t.optString("startTime") else null,
+                                    endTime = if (t.has("endTime") && !t.isNull("endTime")) t.optString("endTime") else null,
+                                    distanceKm = t.optDouble("distanceKm", 0.0),
+                                    deliveryNotes = if (t.has("deliveryNotes") && !t.isNull("deliveryNotes")) t.optString("deliveryNotes") else null,
+                                    tripAmount = t.optDouble("tripAmount", 0.0)
+                                )
+                            )
+                        }
+                    }
+                    tripsConn.disconnect()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed fetching trips for lorry $lorryId: ${e.message}")
+                }
+            }
+
+            val distinctTrips = allTrips.distinctBy { it.id }.sortedWith(
+                compareByDescending<OwnerTripItemUiState> { it.tripDate }
+                    .thenByDescending { it.id }
+            )
+
+            Result.success(Pair(distinctTrips, distinctTrips.size.toLong()))
+        } catch (e: Exception) {
+            Log.e(TAG, "Legacy fallback failed: ${e.message}", e)
+            Result.failure(e)
+        }
     }
 }

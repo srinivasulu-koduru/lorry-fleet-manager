@@ -317,6 +317,14 @@ class OwnerTripDetailsViewModel(
                     )
 
                     return Result.success(details)
+                } else if (connection.responseCode in listOf(HttpURLConnection.HTTP_NOT_FOUND, HttpURLConnection.HTTP_BAD_METHOD)) {
+                    Log.i(TAG, "Server returned ${connection.responseCode} on /details. Falling back to basic /api/owner/trips/$tripId")
+                    val fallback = fetchDetailsFallbackLegacy(baseUrl, token)
+                    if (fallback.isSuccess) {
+                        return fallback
+                    }
+                    val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    lastException = Exception("HTTP ${connection.responseCode}: $err")
                 } else {
                     val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
                     lastException = Exception("HTTP ${connection.responseCode}: $err")
@@ -330,6 +338,62 @@ class OwnerTripDetailsViewModel(
         }
 
         return Result.failure(lastException ?: Exception("Network request failed"))
+    }
+
+    private fun fetchDetailsFallbackLegacy(baseUrl: String, token: String): Result<OwnerTripDetailsUiState> {
+        return try {
+            val url = URL("$baseUrl/api/owner/trips/$tripId")
+            val conn = (url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer $token")
+            }
+
+            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                val raw = conn.inputStream.bufferedReader().use(BufferedReader::readText)
+                val json = JSONObject(raw)
+                val revenue = json.optDouble("tripAmount", 0.0)
+                val state = OwnerTripDetailsUiState(
+                    id = json.optLong("id", tripId),
+                    tripReference = json.optString("tripReference", "TRIP-$tripId"),
+                    lorryId = if (json.has("lorryId") && !json.isNull("lorryId")) json.optLong("lorryId") else null,
+                    lorryRegistration = json.optString("lorryRegistration", "Fleet Lorry"),
+                    lorryMakeModel = if (json.has("lorryMakeModel") && !json.isNull("lorryMakeModel")) json.optString("lorryMakeModel") else null,
+                    driverId = if (json.has("driverId") && !json.isNull("driverId")) json.optLong("driverId") else null,
+                    driverName = json.optString("driverName", "Unassigned Driver"),
+                    driverPhone = null,
+                    origin = json.optString("originLocation", "Unknown"),
+                    destination = json.optString("destinationLocation", "Unknown"),
+                    plannedDepartureDate = if (json.has("tripDate") && !json.isNull("tripDate")) json.optString("tripDate") else null,
+                    plannedDepartureTime = if (json.has("startTime") && !json.isNull("startTime")) json.optString("startTime") else null,
+                    startTime = if (json.has("startTime") && !json.isNull("startTime")) json.optString("startTime") else null,
+                    plannedDeliveryDate = null,
+                    plannedDeliveryTime = null,
+                    endTime = if (json.has("endTime") && !json.isNull("endTime")) json.optString("endTime") else null,
+                    status = json.optString("tripStatus", "PLANNED"),
+                    distanceKm = json.optDouble("distanceKm", 0.0),
+                    loadType = null,
+                    remarks = if (json.has("deliveryNotes") && !json.isNull("deliveryNotes")) json.optString("deliveryNotes") else null,
+                    tripRevenue = revenue,
+                    maintenanceExpenses = 0.0,
+                    fuelExpenses = 0.0,
+                    driverExpenses = 0.0,
+                    otherExpenses = 0.0,
+                    totalExpenses = 0.0,
+                    netProfit = revenue,
+                    maintenanceRecords = emptyList(),
+                    otherExpensesList = emptyList()
+                )
+                Result.success(state)
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                Result.failure(Exception("HTTP ${conn.responseCode}: $err"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private fun postExpenseToBackend(
