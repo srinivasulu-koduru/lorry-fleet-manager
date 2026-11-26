@@ -92,13 +92,15 @@ data class OwnerTripDetailsUiState(
 class OwnerTripDetailsViewModel(
     val tripId: Long,
     private val sessionManager: SessionManager? = null,
-    autoLoad: Boolean = true
+    autoLoad: Boolean = true,
+    private val baseUrlOverride: String? = null,
+    private val tokenOverride: String? = null
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "OwnerTripDetailsVM"
-        private const val CONNECT_TIMEOUT_MS = 10000
-        private const val READ_TIMEOUT_MS = 10000
+        private const val CONNECT_TIMEOUT_MS = 15000
+        private const val READ_TIMEOUT_MS = 20000
     }
 
     var uiState by mutableStateOf(OwnerTripDetailsUiState(id = tripId))
@@ -210,13 +212,21 @@ class OwnerTripDetailsViewModel(
         }
     }
 
+    internal fun fetchDetailsBlocking(): Result<OwnerTripDetailsUiState> {
+        return fetchDetailsFromBackend()
+    }
+
     private fun fetchDetailsFromBackend(): Result<OwnerTripDetailsUiState> {
-        val token = sessionManager?.getAccessToken()
+        val token = tokenOverride ?: sessionManager?.getAccessToken()
         if (token.isNullOrBlank()) {
             return Result.failure(IllegalStateException("Session token missing"))
         }
 
-        val candidateUrls = ApiConfig.getCandidateBaseUrls(sessionManager)
+        val candidateUrls = if (!baseUrlOverride.isNullOrBlank()) {
+            listOf(baseUrlOverride.removeSuffix("/"))
+        } else {
+            ApiConfig.getCandidateBaseUrls(sessionManager)
+        }
         var lastException: Exception? = null
 
         for (baseUrl in candidateUrls) {
@@ -232,7 +242,8 @@ class OwnerTripDetailsViewModel(
                     setRequestProperty("Authorization", "Bearer $token")
                 }
 
-                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
                     val rawJson = connection.inputStream.bufferedReader().use(BufferedReader::readText)
                     val json = JSONObject(rawJson)
 
@@ -245,16 +256,16 @@ class OwnerTripDetailsViewModel(
                             TripMaintenanceItemUiState(
                                 id = obj.optLong("id"),
                                 lorryId = if (obj.has("lorryId") && !obj.isNull("lorryId")) obj.optLong("lorryId") else null,
-                                lorryRegistration = obj.optString("lorryRegistration", ""),
-                                maintenanceDate = obj.optString("maintenanceDate", ""),
-                                serviceType = obj.optString("serviceType", "Service"),
-                                description = obj.optString("description", ""),
+                                lorryRegistration = optSafeString(obj, "lorryRegistration", ""),
+                                maintenanceDate = optSafeString(obj, "maintenanceDate", ""),
+                                serviceType = optSafeString(obj, "serviceType", "Service"),
+                                description = optSafeString(obj, "description", ""),
                                 cost = obj.optDouble("cost", 0.0),
-                                serviceCenter = if (obj.has("serviceCenter") && !obj.isNull("serviceCenter")) obj.optString("serviceCenter") else null,
+                                serviceCenter = optNullableString(obj, "serviceCenter"),
                                 odometerReadingKm = if (obj.has("odometerReadingKm") && !obj.isNull("odometerReadingKm")) obj.optInt("odometerReadingKm") else null,
-                                nextServiceDate = if (obj.has("nextServiceDate") && !obj.isNull("nextServiceDate")) obj.optString("nextServiceDate") else null,
+                                nextServiceDate = optNullableString(obj, "nextServiceDate"),
                                 tripId = if (obj.has("tripId") && !obj.isNull("tripId")) obj.optLong("tripId") else null,
-                                tripReference = if (obj.has("tripReference") && !obj.isNull("tripReference")) obj.optString("tripReference") else null
+                                tripReference = optNullableString(obj, "tripReference")
                             )
                         )
                     }
@@ -268,42 +279,42 @@ class OwnerTripDetailsViewModel(
                             TripExpenseItemUiState(
                                 id = obj.optLong("id"),
                                 lorryId = if (obj.has("lorryId") && !obj.isNull("lorryId")) obj.optLong("lorryId") else null,
-                                lorryRegistration = obj.optString("lorryRegistration", ""),
+                                lorryRegistration = optSafeString(obj, "lorryRegistration", ""),
                                 tripId = if (obj.has("tripId") && !obj.isNull("tripId")) obj.optLong("tripId") else null,
-                                tripReference = if (obj.has("tripReference") && !obj.isNull("tripReference")) obj.optString("tripReference") else null,
-                                transactionType = obj.optString("transactionType", "EXPENSE"),
-                                category = obj.optString("category", "OTHER"),
-                                description = obj.optString("description", ""),
+                                tripReference = optNullableString(obj, "tripReference"),
+                                transactionType = optSafeString(obj, "transactionType", "EXPENSE"),
+                                category = optSafeString(obj, "category", "OTHER"),
+                                description = optSafeString(obj, "description", ""),
                                 amount = obj.optDouble("amount", 0.0),
-                                transactionDate = obj.optString("transactionDate", ""),
-                                paymentStatus = obj.optString("paymentStatus", "PAID"),
-                                paymentMode = if (obj.has("paymentMode") && !obj.isNull("paymentMode")) obj.optString("paymentMode") else null,
-                                referenceNumber = if (obj.has("referenceNumber") && !obj.isNull("referenceNumber")) obj.optString("referenceNumber") else null
+                                transactionDate = optSafeString(obj, "transactionDate", ""),
+                                paymentStatus = optSafeString(obj, "paymentStatus", "PAID"),
+                                paymentMode = optNullableString(obj, "paymentMode"),
+                                referenceNumber = optNullableString(obj, "referenceNumber")
                             )
                         )
                     }
 
                     val details = OwnerTripDetailsUiState(
                         id = json.optLong("id", tripId),
-                        tripReference = json.optString("tripReference", ""),
+                        tripReference = optSafeString(json, "tripReference", ""),
                         lorryId = if (json.has("lorryId") && !json.isNull("lorryId")) json.optLong("lorryId") else null,
-                        lorryRegistration = json.optString("lorryRegistration", "Fleet Lorry"),
-                        lorryMakeModel = if (json.has("lorryMakeModel") && !json.isNull("lorryMakeModel")) json.optString("lorryMakeModel") else null,
+                        lorryRegistration = optSafeString(json, "lorryRegistration", "Fleet Lorry"),
+                        lorryMakeModel = optNullableString(json, "lorryMakeModel"),
                         driverId = if (json.has("driverId") && !json.isNull("driverId")) json.optLong("driverId") else null,
-                        driverName = json.optString("driverName", "Unassigned"),
-                        driverPhone = if (json.has("driverPhone") && !json.isNull("driverPhone")) json.optString("driverPhone") else null,
-                        origin = json.optString("origin", "Unknown"),
-                        destination = json.optString("destination", "Unknown"),
-                        plannedDepartureDate = if (json.has("plannedDepartureDate") && !json.isNull("plannedDepartureDate")) json.optString("plannedDepartureDate") else null,
-                        plannedDepartureTime = if (json.has("plannedDepartureTime") && !json.isNull("plannedDepartureTime")) json.optString("plannedDepartureTime") else null,
-                        startTime = if (json.has("startTime") && !json.isNull("startTime")) json.optString("startTime") else null,
-                        plannedDeliveryDate = if (json.has("plannedDeliveryDate") && !json.isNull("plannedDeliveryDate")) json.optString("plannedDeliveryDate") else null,
-                        plannedDeliveryTime = if (json.has("plannedDeliveryTime") && !json.isNull("plannedDeliveryTime")) json.optString("plannedDeliveryTime") else null,
-                        endTime = if (json.has("endTime") && !json.isNull("endTime")) json.optString("endTime") else null,
-                        status = json.optString("status", "PLANNED"),
+                        driverName = optSafeString(json, "driverName", "Unassigned"),
+                        driverPhone = optNullableString(json, "driverPhone"),
+                        origin = optSafeString(json, "origin", optSafeString(json, "originLocation", "Unknown")),
+                        destination = optSafeString(json, "destination", optSafeString(json, "destinationLocation", "Unknown")),
+                        plannedDepartureDate = optNullableString(json, "plannedDepartureDate") ?: optNullableString(json, "tripDate"),
+                        plannedDepartureTime = optNullableString(json, "plannedDepartureTime"),
+                        startTime = optNullableString(json, "startTime"),
+                        plannedDeliveryDate = optNullableString(json, "plannedDeliveryDate"),
+                        plannedDeliveryTime = optNullableString(json, "plannedDeliveryTime"),
+                        endTime = optNullableString(json, "endTime"),
+                        status = optSafeString(json, "status", optSafeString(json, "tripStatus", "PLANNED")),
                         distanceKm = json.optDouble("distanceKm", 0.0),
-                        loadType = if (json.has("loadType") && !json.isNull("loadType")) json.optString("loadType") else null,
-                        remarks = if (json.has("remarks") && !json.isNull("remarks")) json.optString("remarks") else null,
+                        loadType = optNullableString(json, "loadType"),
+                        remarks = optNullableString(json, "remarks") ?: optNullableString(json, "deliveryNotes"),
                         // Financial breakdown calculated server-side
                         tripRevenue = json.optDouble("tripRevenue", 0.0),
                         maintenanceExpenses = json.optDouble("maintenanceExpenses", 0.0),
@@ -317,17 +328,30 @@ class OwnerTripDetailsViewModel(
                     )
 
                     return Result.success(details)
-                } else if (connection.responseCode in listOf(HttpURLConnection.HTTP_NOT_FOUND, HttpURLConnection.HTTP_BAD_METHOD)) {
-                    Log.i(TAG, "Server returned ${connection.responseCode} on /details. Falling back to basic /api/owner/trips/$tripId")
+                } else if (responseCode in listOf(
+                        HttpURLConnection.HTTP_NOT_FOUND,
+                        HttpURLConnection.HTTP_BAD_METHOD,
+                        HttpURLConnection.HTTP_NOT_IMPLEMENTED
+                    )
+                ) {
+                    val primaryErr = runCatching {
+                        connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    }.getOrNull()
+                    connection.disconnect()
+                    connection = null
+
+                    Log.i(TAG, "Server returned HTTP $responseCode on /details. Falling back to basic /api/owner/trips/$tripId")
                     val fallback = fetchDetailsFallbackLegacy(baseUrl, token)
                     if (fallback.isSuccess) {
                         return fallback
                     }
-                    val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
-                    lastException = Exception("HTTP ${connection.responseCode}: $err")
+                    lastException = (fallback.exceptionOrNull() as? Exception)
+                        ?: Exception("HTTP $responseCode fallback failed: $primaryErr")
                 } else {
-                    val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
-                    lastException = Exception("HTTP ${connection.responseCode}: $err")
+                    val err = runCatching {
+                        connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    }.getOrNull()
+                    lastException = Exception("HTTP $responseCode: $err")
                 }
             } catch (e: Exception) {
                 lastException = e
@@ -341,9 +365,10 @@ class OwnerTripDetailsViewModel(
     }
 
     private fun fetchDetailsFallbackLegacy(baseUrl: String, token: String): Result<OwnerTripDetailsUiState> {
+        var conn: HttpURLConnection? = null
         return try {
             val url = URL("$baseUrl/api/owner/trips/$tripId")
-            val conn = (url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+            conn = (url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
@@ -351,31 +376,37 @@ class OwnerTripDetailsViewModel(
                 setRequestProperty("Authorization", "Bearer $token")
             }
 
-            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+            val code = conn.responseCode
+            if (code == HttpURLConnection.HTTP_OK) {
                 val raw = conn.inputStream.bufferedReader().use(BufferedReader::readText)
+                conn.disconnect()
+                conn = null
+
                 val json = JSONObject(raw)
                 val revenue = json.optDouble("tripAmount", 0.0)
+                val lorryId = if (json.has("lorryId") && !json.isNull("lorryId")) json.optLong("lorryId") else null
+
                 val state = OwnerTripDetailsUiState(
                     id = json.optLong("id", tripId),
-                    tripReference = json.optString("tripReference", "TRIP-$tripId"),
-                    lorryId = if (json.has("lorryId") && !json.isNull("lorryId")) json.optLong("lorryId") else null,
-                    lorryRegistration = json.optString("lorryRegistration", "Fleet Lorry"),
-                    lorryMakeModel = if (json.has("lorryMakeModel") && !json.isNull("lorryMakeModel")) json.optString("lorryMakeModel") else null,
+                    tripReference = optSafeString(json, "tripReference", "TRIP-$tripId"),
+                    lorryId = lorryId,
+                    lorryRegistration = optSafeString(json, "lorryRegistration", "Fleet Lorry"),
+                    lorryMakeModel = optNullableString(json, "lorryMakeModel"),
                     driverId = if (json.has("driverId") && !json.isNull("driverId")) json.optLong("driverId") else null,
-                    driverName = json.optString("driverName", "Unassigned Driver"),
-                    driverPhone = null,
-                    origin = json.optString("originLocation", "Unknown"),
-                    destination = json.optString("destinationLocation", "Unknown"),
-                    plannedDepartureDate = if (json.has("tripDate") && !json.isNull("tripDate")) json.optString("tripDate") else null,
-                    plannedDepartureTime = if (json.has("startTime") && !json.isNull("startTime")) json.optString("startTime") else null,
-                    startTime = if (json.has("startTime") && !json.isNull("startTime")) json.optString("startTime") else null,
-                    plannedDeliveryDate = null,
-                    plannedDeliveryTime = null,
-                    endTime = if (json.has("endTime") && !json.isNull("endTime")) json.optString("endTime") else null,
-                    status = json.optString("tripStatus", "PLANNED"),
+                    driverName = optSafeString(json, "driverName", "Unassigned Driver"),
+                    driverPhone = optNullableString(json, "driverPhone"),
+                    origin = optSafeString(json, "origin", optSafeString(json, "originLocation", "Unknown")),
+                    destination = optSafeString(json, "destination", optSafeString(json, "destinationLocation", "Unknown")),
+                    plannedDepartureDate = optNullableString(json, "plannedDepartureDate") ?: optNullableString(json, "tripDate"),
+                    plannedDepartureTime = optNullableString(json, "plannedDepartureTime"),
+                    startTime = optNullableString(json, "startTime"),
+                    plannedDeliveryDate = optNullableString(json, "plannedDeliveryDate"),
+                    plannedDeliveryTime = optNullableString(json, "plannedDeliveryTime"),
+                    endTime = optNullableString(json, "endTime"),
+                    status = optSafeString(json, "status", optSafeString(json, "tripStatus", "PLANNED")),
                     distanceKm = json.optDouble("distanceKm", 0.0),
-                    loadType = null,
-                    remarks = if (json.has("deliveryNotes") && !json.isNull("deliveryNotes")) json.optString("deliveryNotes") else null,
+                    loadType = optNullableString(json, "loadType"),
+                    remarks = optNullableString(json, "remarks") ?: optNullableString(json, "deliveryNotes"),
                     tripRevenue = revenue,
                     maintenanceExpenses = 0.0,
                     fuelExpenses = 0.0,
@@ -388,12 +419,28 @@ class OwnerTripDetailsViewModel(
                 )
                 Result.success(state)
             } else {
-                val err = conn.errorStream?.bufferedReader()?.use(BufferedReader::readText)
-                Result.failure(Exception("HTTP ${conn.responseCode}: $err"))
+                val err = runCatching {
+                    conn.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                }.getOrNull()
+                Result.failure(Exception("HTTP $code: $err"))
             }
         } catch (e: Exception) {
             Result.failure(e)
+        } finally {
+            conn?.disconnect()
         }
+    }
+
+    private fun optSafeString(obj: JSONObject, key: String, default: String): String {
+        if (!obj.has(key) || obj.isNull(key)) return default
+        val value = obj.optString(key, default)
+        return if (value.isBlank() || value.equals("null", ignoreCase = true)) default else value
+    }
+
+    private fun optNullableString(obj: JSONObject, key: String): String? {
+        if (!obj.has(key) || obj.isNull(key)) return null
+        val value = obj.optString(key, "")
+        return if (value.isBlank() || value.equals("null", ignoreCase = true)) null else value
     }
 
     private fun postExpenseToBackend(
@@ -405,12 +452,16 @@ class OwnerTripDetailsViewModel(
         workshop: String,
         odometerKm: Int?
     ): Result<Unit> {
-        val token = sessionManager?.getAccessToken()
+        val token = tokenOverride ?: sessionManager?.getAccessToken()
         if (token.isNullOrBlank()) {
             return Result.failure(IllegalStateException("Session token missing"))
         }
 
-        val candidateUrls = ApiConfig.getCandidateBaseUrls(sessionManager)
+        val candidateUrls = if (!baseUrlOverride.isNullOrBlank()) {
+            listOf(baseUrlOverride.removeSuffix("/"))
+        } else {
+            ApiConfig.getCandidateBaseUrls(sessionManager)
+        }
         var lastException: Exception? = null
 
         val payload = JSONObject().apply {
@@ -443,8 +494,12 @@ class OwnerTripDetailsViewModel(
                 val code = connection.responseCode
                 if (code == HttpURLConnection.HTTP_CREATED || code == HttpURLConnection.HTTP_OK) {
                     return Result.success(Unit)
+                } else if (code in listOf(HttpURLConnection.HTTP_NOT_FOUND, HttpURLConnection.HTTP_BAD_METHOD)) {
+                    lastException = Exception("Trip expense endpoint not active yet on server (HTTP $code). Please redeploy the backend service.")
                 } else {
-                    val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    val err = runCatching {
+                        connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    }.getOrNull()
                     lastException = Exception("HTTP $code: $err")
                 }
             } catch (e: Exception) {
@@ -459,12 +514,16 @@ class OwnerTripDetailsViewModel(
     }
 
     private fun deleteRecordFromBackend(path: String): Result<Unit> {
-        val token = sessionManager?.getAccessToken()
+        val token = tokenOverride ?: sessionManager?.getAccessToken()
         if (token.isNullOrBlank()) {
             return Result.failure(IllegalStateException("Session token missing"))
         }
 
-        val candidateUrls = ApiConfig.getCandidateBaseUrls(sessionManager)
+        val candidateUrls = if (!baseUrlOverride.isNullOrBlank()) {
+            listOf(baseUrlOverride.removeSuffix("/"))
+        } else {
+            ApiConfig.getCandidateBaseUrls(sessionManager)
+        }
         var lastException: Exception? = null
 
         for (baseUrl in candidateUrls) {

@@ -51,13 +51,15 @@ data class OwnerTripHistoryUiState(
 
 class OwnerTripHistoryViewModel(
     private val sessionManager: SessionManager? = null,
-    autoLoad: Boolean = true
+    autoLoad: Boolean = true,
+    private val baseUrlOverride: String? = null,
+    private val tokenOverride: String? = null
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "OwnerTripHistoryVM"
-        private const val CONNECT_TIMEOUT_MS = 10000
-        private const val READ_TIMEOUT_MS = 10000
+        private const val CONNECT_TIMEOUT_MS = 15000
+        private const val READ_TIMEOUT_MS = 20000
     }
 
     var uiState by mutableStateOf(OwnerTripHistoryUiState())
@@ -160,17 +162,29 @@ class OwnerTripHistoryViewModel(
         }
     }
 
+    internal fun fetchTripsBlocking(
+        page: Int = 0,
+        status: String = uiState.selectedFilter,
+        search: String = uiState.searchQuery
+    ): Result<Pair<List<OwnerTripItemUiState>, Long>> {
+        return fetchTripsFromBackend(page, status, search)
+    }
+
     private fun fetchTripsFromBackend(
         page: Int,
         status: String,
         search: String
     ): Result<Pair<List<OwnerTripItemUiState>, Long>> {
-        val token = sessionManager?.getAccessToken()
+        val token = tokenOverride ?: sessionManager?.getAccessToken()
         if (token.isNullOrBlank()) {
             return Result.failure(IllegalStateException("Session token missing"))
         }
 
-        val candidateUrls = ApiConfig.getCandidateBaseUrls(sessionManager)
+        val candidateUrls = if (!baseUrlOverride.isNullOrBlank()) {
+            listOf(baseUrlOverride.removeSuffix("/"))
+        } else {
+            ApiConfig.getCandidateBaseUrls(sessionManager)
+        }
         var lastException: Exception? = null
 
         val queryParams = StringBuilder("?page=$page&size=50")
@@ -205,40 +219,34 @@ class OwnerTripHistoryViewModel(
 
                     for (i in 0 until tripsArray.length()) {
                         val obj = tripsArray.getJSONObject(i)
-                        items.add(
-                            OwnerTripItemUiState(
-                                id = obj.optLong("id"),
-                                tripReference = obj.optString("tripReference", "TRIP-$i"),
-                                driverId = if (obj.has("driverId") && !obj.isNull("driverId")) obj.optLong("driverId") else null,
-                                driverName = obj.optString("driverName", "Unassigned"),
-                                lorryId = if (obj.has("lorryId") && !obj.isNull("lorryId")) obj.optLong("lorryId") else null,
-                                lorryRegistration = obj.optString("lorryRegistration", "Fleet Lorry"),
-                                lorryMakeModel = if (obj.has("lorryMakeModel") && !obj.isNull("lorryMakeModel")) obj.optString("lorryMakeModel") else null,
-                                originLocation = obj.optString("originLocation", "Unknown"),
-                                destinationLocation = obj.optString("destinationLocation", "Unknown"),
-                                tripStatus = obj.optString("tripStatus", "COMPLETED"),
-                                tripDate = obj.optString("tripDate", ""),
-                                startTime = if (obj.has("startTime") && !obj.isNull("startTime")) obj.optString("startTime") else null,
-                                endTime = if (obj.has("endTime") && !obj.isNull("endTime")) obj.optString("endTime") else null,
-                                distanceKm = obj.optDouble("distanceKm", 0.0),
-                                deliveryNotes = if (obj.has("deliveryNotes") && !obj.isNull("deliveryNotes")) obj.optString("deliveryNotes") else null,
-                                tripAmount = obj.optDouble("tripAmount", 0.0)
-                            )
-                        )
+                        items.add(parseTripItem(obj, i))
                     }
 
                     return Result.success(Pair(items, totalElements))
-                } else if (responseCode == HttpURLConnection.HTTP_BAD_METHOD) {
-                    // Fallback: Legacy server does not yet have GET /api/owner/trips deployed
-                    Log.i(TAG, "Server returned HTTP 405 on /api/owner/trips. Falling back to lorry trip aggregation...")
+                } else if (responseCode in listOf(
+                        HttpURLConnection.HTTP_BAD_METHOD,
+                        HttpURLConnection.HTTP_NOT_FOUND,
+                        HttpURLConnection.HTTP_NOT_IMPLEMENTED
+                    )
+                ) {
+                    // Drain and close the 405/404 connection before opening fallback requests
+                    val primaryErr = runCatching {
+                        connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    }.getOrNull()
+                    connection.disconnect()
+                    connection = null
+
+                    Log.i(TAG, "Server returned HTTP $responseCode on /api/owner/trips. Falling back to lorry trip aggregation...")
                     val fallback = fetchTripsFallbackLegacy(baseUrl, token)
                     if (fallback.isSuccess) {
                         return fallback
                     }
-                    val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
-                    lastException = Exception("HTTP $responseCode: $err")
+                    lastException = (fallback.exceptionOrNull() as? Exception)
+                        ?: Exception("HTTP $responseCode fallback failed: $primaryErr")
                 } else {
-                    val err = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    val err = runCatching {
+                        connection.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                    }.getOrNull()
                     lastException = Exception("HTTP $responseCode: $err")
                 }
             } catch (e: Exception) {
@@ -256,9 +264,10 @@ class OwnerTripHistoryViewModel(
         baseUrl: String,
         token: String
     ): Result<Pair<List<OwnerTripItemUiState>, Long>> {
+        var lorriesConn: HttpURLConnection? = null
         return try {
             val lorriesUrl = URL("$baseUrl/api/owner/lorries")
-            val lorriesConn = (lorriesUrl.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+            lorriesConn = (lorriesUrl.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
@@ -266,23 +275,34 @@ class OwnerTripHistoryViewModel(
                 setRequestProperty("Authorization", "Bearer $token")
             }
 
-            if (lorriesConn.responseCode != HttpURLConnection.HTTP_OK) {
-                return Result.failure(Exception("HTTP ${lorriesConn.responseCode}: Failed to fetch fleet lorries"))
+            val lorriesResponseCode = lorriesConn.responseCode
+            if (lorriesResponseCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                return Result.failure(Exception("Session expired (HTTP 401). Please log in again."))
+            }
+            if (lorriesResponseCode != HttpURLConnection.HTTP_OK) {
+                val errBody = runCatching {
+                    lorriesConn.errorStream?.bufferedReader()?.use(BufferedReader::readText)
+                }.getOrNull()
+                return Result.failure(Exception("HTTP $lorriesResponseCode: Failed to fetch fleet lorries ${errBody ?: ""}".trim()))
             }
 
             val lorriesRaw = lorriesConn.inputStream.bufferedReader().use(BufferedReader::readText)
+            lorriesConn.disconnect()
+            lorriesConn = null
+
             val lorriesArray = org.json.JSONArray(lorriesRaw)
             val allTrips = mutableListOf<OwnerTripItemUiState>()
 
             for (i in 0 until lorriesArray.length()) {
                 val lorryObj = lorriesArray.getJSONObject(i)
                 val lorryId = lorryObj.optLong("id")
-                val regNumber = lorryObj.optString("registrationNumber", "Fleet Lorry")
-                val makeModel = lorryObj.optString("makeModel", "")
+                val regNumber = optSafeString(lorryObj, "registrationNumber", "Fleet Lorry")
+                val makeModel = optNullableString(lorryObj, "makeModel")
 
+                var tripsConn: HttpURLConnection? = null
                 try {
                     val tripsUrl = URL("$baseUrl/api/owner/lorries/$lorryId/trips?size=50")
-                    val tripsConn = (tripsUrl.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
+                    tripsConn = (tripsUrl.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection).apply {
                         requestMethod = "GET"
                         connectTimeout = CONNECT_TIMEOUT_MS
                         readTimeout = READ_TIMEOUT_MS
@@ -298,30 +318,20 @@ class OwnerTripHistoryViewModel(
                         for (j in 0 until tripsArr.length()) {
                             val t = tripsArr.getJSONObject(j)
                             allTrips.add(
-                                OwnerTripItemUiState(
-                                    id = t.optLong("id"),
-                                    tripReference = t.optString("tripReference", "TRIP-${t.optLong("id")}"),
-                                    driverId = if (t.has("driverId") && !t.isNull("driverId")) t.optLong("driverId") else null,
-                                    driverName = t.optString("driverName", "Unassigned Driver"),
-                                    lorryId = if (t.has("lorryId") && !t.isNull("lorryId")) t.optLong("lorryId") else lorryId,
-                                    lorryRegistration = t.optString("lorryRegistration", regNumber),
-                                    lorryMakeModel = if (makeModel.isNotBlank()) makeModel else null,
-                                    originLocation = t.optString("originLocation", "Unknown"),
-                                    destinationLocation = t.optString("destinationLocation", "Unknown"),
-                                    tripStatus = t.optString("tripStatus", "COMPLETED"),
-                                    tripDate = t.optString("tripDate", ""),
-                                    startTime = if (t.has("startTime") && !t.isNull("startTime")) t.optString("startTime") else null,
-                                    endTime = if (t.has("endTime") && !t.isNull("endTime")) t.optString("endTime") else null,
-                                    distanceKm = t.optDouble("distanceKm", 0.0),
-                                    deliveryNotes = if (t.has("deliveryNotes") && !t.isNull("deliveryNotes")) t.optString("deliveryNotes") else null,
-                                    tripAmount = t.optDouble("tripAmount", 0.0)
+                                parseTripItem(
+                                    obj = t,
+                                    index = j,
+                                    fallbackLorryId = lorryId,
+                                    fallbackReg = regNumber,
+                                    fallbackMakeModel = makeModel
                                 )
                             )
                         }
                     }
-                    tripsConn.disconnect()
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed fetching trips for lorry $lorryId: ${e.message}")
+                } finally {
+                    tripsConn?.disconnect()
                 }
             }
 
@@ -334,6 +344,48 @@ class OwnerTripHistoryViewModel(
         } catch (e: Exception) {
             Log.e(TAG, "Legacy fallback failed: ${e.message}", e)
             Result.failure(e)
+        } finally {
+            lorriesConn?.disconnect()
         }
+    }
+
+    private fun parseTripItem(
+        obj: JSONObject,
+        index: Int,
+        fallbackLorryId: Long? = null,
+        fallbackReg: String = "Fleet Lorry",
+        fallbackMakeModel: String? = null
+    ): OwnerTripItemUiState {
+        val id = obj.optLong("id")
+        return OwnerTripItemUiState(
+            id = id,
+            tripReference = optSafeString(obj, "tripReference", "TRIP-${if (id > 0) id else index}"),
+            driverId = if (obj.has("driverId") && !obj.isNull("driverId")) obj.optLong("driverId") else null,
+            driverName = optSafeString(obj, "driverName", "Unassigned Driver"),
+            lorryId = if (obj.has("lorryId") && !obj.isNull("lorryId")) obj.optLong("lorryId") else fallbackLorryId,
+            lorryRegistration = optSafeString(obj, "lorryRegistration", fallbackReg),
+            lorryMakeModel = optNullableString(obj, "lorryMakeModel") ?: fallbackMakeModel,
+            originLocation = optSafeString(obj, "originLocation", optSafeString(obj, "origin", "Unknown")),
+            destinationLocation = optSafeString(obj, "destinationLocation", optSafeString(obj, "destination", "Unknown")),
+            tripStatus = optSafeString(obj, "tripStatus", optSafeString(obj, "status", "COMPLETED")),
+            tripDate = optSafeString(obj, "tripDate", optSafeString(obj, "plannedDepartureDate", "")),
+            startTime = optNullableString(obj, "startTime") ?: optNullableString(obj, "plannedDepartureTime"),
+            endTime = optNullableString(obj, "endTime"),
+            distanceKm = obj.optDouble("distanceKm", 0.0),
+            deliveryNotes = optNullableString(obj, "deliveryNotes") ?: optNullableString(obj, "remarks"),
+            tripAmount = obj.optDouble("tripAmount", 0.0)
+        )
+    }
+
+    private fun optSafeString(obj: JSONObject, key: String, default: String): String {
+        if (!obj.has(key) || obj.isNull(key)) return default
+        val value = obj.optString(key, default)
+        return if (value.isBlank() || value.equals("null", ignoreCase = true)) default else value
+    }
+
+    private fun optNullableString(obj: JSONObject, key: String): String? {
+        if (!obj.has(key) || obj.isNull(key)) return null
+        val value = obj.optString(key, "")
+        return if (value.isBlank() || value.equals("null", ignoreCase = true)) null else value
     }
 }

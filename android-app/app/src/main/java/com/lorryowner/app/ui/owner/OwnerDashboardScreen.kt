@@ -532,6 +532,7 @@ fun OwnerDashboardScreen(
                 },
                 onNavigateToHome = { currentDestination = OwnerDestination.DASHBOARD },
                 onNavigateToMaintenance = { currentDestination = OwnerDestination.MAINTENANCE_DASHBOARD },
+                onNavigateToTrips = { currentDestination = OwnerDestination.TRIP_HISTORY },
                 onNavigateToLiveTracking = { currentDestination = OwnerDestination.LIVE_TRACKING_LIST },
                 onNavigateToMore = {
                     currentDestination = OwnerDestination.DASHBOARD

@@ -1,7 +1,10 @@
 package com.lorryowner.app.ui.owner
 
+import com.sun.net.httpserver.HttpServer
 import org.junit.Assert.*
 import org.junit.Test
+import java.net.InetSocketAddress
+import java.util.concurrent.CopyOnWriteArrayList
 
 class OwnerTripHistoryModelTest {
 
@@ -284,5 +287,106 @@ class OwnerTripHistoryModelTest {
 
         assertNull(itemWithoutTrip.tripId)
         assertNull(itemWithoutTrip.tripReference)
+    }
+
+    @Test
+    fun testTripHistoryFallback_whenServerReturns405_fallsBackToLorriesEndpoint() {
+        val visitedPaths = CopyOnWriteArrayList<String>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/api/owner/trips") { exchange ->
+            visitedPaths.add(exchange.requestURI.path)
+            val body = """{"status":405,"error":"Method Not Allowed"}""".toByteArray()
+            exchange.sendResponseHeaders(405, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.createContext("/api/owner/lorries") { exchange ->
+            visitedPaths.add(exchange.requestURI.path)
+            val body = "[]".toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        try {
+            val baseUrl = "http://127.0.0.1:${server.address.port}"
+            val vm = OwnerTripHistoryViewModel(
+                sessionManager = null,
+                autoLoad = false,
+                baseUrlOverride = baseUrl,
+                tokenOverride = "test-jwt-token"
+            )
+            val result = vm.fetchTripsBlocking()
+            assertTrue("Expected fallback to succeed, got: ${result.exceptionOrNull()}", result.isSuccess)
+            assertTrue(visitedPaths.contains("/api/owner/trips"))
+            assertTrue(visitedPaths.contains("/api/owner/lorries"))
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun testTripHistoryFallback_whenFallbackFails_doesNotMaskWith405() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/api/owner/trips") { exchange ->
+            val body = """{"status":405,"error":"Method Not Allowed"}""".toByteArray()
+            exchange.sendResponseHeaders(405, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.createContext("/api/owner/lorries") { exchange ->
+            val body = """{"error":"Internal"}""".toByteArray()
+            exchange.sendResponseHeaders(500, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        try {
+            val baseUrl = "http://127.0.0.1:${server.address.port}"
+            val vm = OwnerTripHistoryViewModel(
+                sessionManager = null,
+                autoLoad = false,
+                baseUrlOverride = baseUrl,
+                tokenOverride = "test-jwt-token"
+            )
+            val result = vm.fetchTripsBlocking()
+            assertTrue(result.isFailure)
+            val msg = result.exceptionOrNull()?.message.orEmpty()
+            assertTrue("Fallback error should expose HTTP 500, got: $msg", msg.contains("500"))
+            assertFalse("Fallback error must not mask with HTTP 405, got: $msg", msg.contains("405"))
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun testTripDetailsFallback_whenDetailsReturns404Or405_fallsBackToBasicTripEndpoint() {
+        val visitedPaths = CopyOnWriteArrayList<String>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/api/owner/trips/101/details") { exchange ->
+            visitedPaths.add(exchange.requestURI.path)
+            val body = """{"status":405,"error":"Method Not Allowed"}""".toByteArray()
+            exchange.sendResponseHeaders(405, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.createContext("/api/owner/trips/101") { exchange ->
+            visitedPaths.add(exchange.requestURI.path)
+            val body = """{"id":101,"tripReference":"TRIP-2026-101"}""".toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        try {
+            val baseUrl = "http://127.0.0.1:${server.address.port}"
+            val vm = OwnerTripDetailsViewModel(
+                tripId = 101L,
+                sessionManager = null,
+                autoLoad = false,
+                baseUrlOverride = baseUrl,
+                tokenOverride = "test-jwt-token"
+            )
+            val result = vm.fetchDetailsBlocking()
+            assertTrue("Expected trip details fallback to succeed, got: ${result.exceptionOrNull()}", result.isSuccess)
+            assertTrue(visitedPaths.contains("/api/owner/trips/101/details"))
+            assertTrue(visitedPaths.contains("/api/owner/trips/101"))
+        } finally {
+            server.stop(0)
+        }
     }
 }

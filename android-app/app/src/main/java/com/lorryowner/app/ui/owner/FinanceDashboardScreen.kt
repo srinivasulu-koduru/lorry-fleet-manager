@@ -32,6 +32,7 @@ fun FinanceDashboardScreen(
     onNavigateToMonthDetails: (year: Int, month: Int) -> Unit = { _, _ -> },
     onNavigateToHome: () -> Unit = {},
     onNavigateToMaintenance: () -> Unit = {},
+    onNavigateToTrips: () -> Unit = onNavigateToMaintenance,
     onNavigateToLiveTracking: () -> Unit = {},
     onNavigateToMore: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -142,7 +143,7 @@ fun FinanceDashboardScreen(
                     when (index) {
                         0 -> onNavigateToHome()
                         1 -> onNavigateToLiveTracking()
-                        2 -> onNavigateToMaintenance()
+                        2 -> onNavigateToTrips()
                         3 -> { /* Already on Finance */ }
                         4 -> onNavigateToMore()
                     }
