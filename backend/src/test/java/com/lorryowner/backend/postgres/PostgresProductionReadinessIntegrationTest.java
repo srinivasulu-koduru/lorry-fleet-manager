@@ -581,4 +581,72 @@ public class PostgresProductionReadinessIntegrationTest {
 
         assertThat(totalUsedMemoryMB).isLessThan(400);
     }
+
+    @Test
+    @Order(12)
+    @DisplayName("12. Owner Trip History, Lorry Trips, Driver Trips & Trip Expenses in PostgreSQL")
+    void testOwnerTripHistoryAndDetailsInPostgres() throws Exception {
+        // 1. Unfiltered Owner Trip History (previously threw PostgreSQL lower(bytea) when search is null)
+        mockMvc.perform(get("/api/owner/trips")
+                        .param("page", "0")
+                        .param("size", "50")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        // 2. Filtered Owner Trip History by status and search
+        mockMvc.perform(get("/api/owner/trips")
+                        .param("status", "COMPLETED")
+                        .param("search", "AP39")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        // 3. Lorry Trip History (unfiltered & filtered)
+        mockMvc.perform(get("/api/owner/lorries/{id}/trips", lorryId)
+                        .param("page", "0")
+                        .param("size", "50")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        // 4. Driver Trip History (unfiltered)
+        mockMvc.perform(get("/api/owner/drivers/{id}/trips", driverId)
+                        .param("page", "0")
+                        .param("size", "50")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        // 5. Add trip-linked maintenance & expense, then verify trip details profit calculation
+        CreateMaintenanceRecordRequest maintReq = new CreateMaintenanceRecordRequest(
+                null, "Trip Tyre Patch", LocalDate.now(), "Midway tyre repair",
+                new BigDecimal("1200.00"), 43000, null, "Highway Tyre Point", null
+        );
+        mockMvc.perform(post("/api/owner/trips/{id}/maintenance", tripId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(maintReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.lorryId").value(lorryId))
+                .andExpect(jsonPath("$.tripId").value(tripId));
+
+        com.lorryowner.backend.dto.trip.CreateTripExpenseRequest fuelReq =
+                new com.lorryowner.backend.dto.trip.CreateTripExpenseRequest(
+                        "DIESEL", "Diesel Refill", new BigDecimal("5000.00"), LocalDate.now(), "Tank full", null, null
+                );
+        mockMvc.perform(post("/api/owner/trips/{id}/expenses", tripId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(fuelReq)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/owner/trips/{id}/details", tripId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(tripId))
+                .andExpect(jsonPath("$.maintenanceExpenses").value(1200.0))
+                .andExpect(jsonPath("$.fuelExpenses").value(23600.0))
+                .andExpect(jsonPath("$.totalExpenses").value(24800.0));
+    }
 }
